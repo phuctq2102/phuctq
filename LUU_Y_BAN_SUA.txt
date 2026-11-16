@@ -1,0 +1,8 @@
+BẢN RÀ SOÁT CT_KV - 16/11/2026
+- Bổ sung nhận diện mẫu Excel: Số lượng nhập (quy đổi) -> sl_dem; Số lượng nhập -> sl_nhap.
+- Không coi 'Số lượng tồn kho' của file CT_KV là SL sổ DSCL.
+- Trang chi tiết hiển thị chênh lệch DSCL và các dòng CT_KV, tổng hợp barcode từ CT_KV và BC bằng dấu ;.
+- Chưa triển khai sửa số lượng/đánh dấu đã kiểm vì cần xác nhận schema và RLS bảng DIEU_CHINH/PHAN_CONG; không giả lập nút lưu.
+- SQL SUPABASE_REPLACE_DIRECT.sql vẫn cần chạy trên đúng dự án Supabase trước khi dùng nút thay thế.
+- Không chạy lệnh xóa dữ liệu trực tiếp trong SQL Editor. Sao lưu trước khi thay thế.
+- Lưu ý: file này chưa được thử nghiệm với Supabase thật hay file Excel nguồn thực tế; cần kiểm thử upload trên bản sao trước.

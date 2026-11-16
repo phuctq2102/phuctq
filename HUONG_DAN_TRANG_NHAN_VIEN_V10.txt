@@ -1,0 +1,16 @@
+V10 - TRANG NHAN VIEN THEO MAU TIM KHU VUC
+
+Da them src/EmployeeCheck.jsx va CSS; chi thay giao dien khi tai khoan NHAN_VIEN vao tab Phan cong.
+Khong thay doi Admin, Supabase Edge Functions, bang SQL, hay CT_KV goc.
+
+Hien thi: ma SP, ten SP, SL dem, SL so, GT chenh lech, trang thai; chi tiet DSCL; CT_KV/BC; khu vuc, barcode, DVT nhap, SL nhap, SL thuc te; them KV; cap nhat trang thai.
+
+CAN KIEM TRA TREN SUPABASE TRUOC KHI SU DUNG THAT:
+1. Nhan vien can quyen SELECT DSCL, CT_KV, BC, DIEU_CHINH theo ma duoc phan cong.
+2. Nhan vien can quyen INSERT/UPDATE DIEU_CHINH va UPDATE PHAN_CONG cho chinh ma duoc phan cong. ZIP khong tu dong mo RLS vi co nguy co lo du lieu.
+3. Khong co transaction nguyen tu cho cap nhat nhieu dong; neu loi giua chung, can kiem tra truoc khi bam lai.
+4. Dong BC khong co CT_KV ID chua duoc ho tro chinh sua truc tiep; co thong bao thay vi luu sai.
+5. Khong co kha nang kiem thu live tren du an Supabase cua ban tu moi truong nay.
+6. Phan hien thi chenh lech dua tren DSCL va DIEU_CHINH; chua dong bo FINAL tu dong.
+
+Cai dat: giai nen, sao chep .env.local cua ban vao thu muc goc, npm install, npm run dev.

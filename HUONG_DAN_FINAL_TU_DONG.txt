@@ -1,0 +1,22 @@
+V10 - FINAL TỰ ĐỘNG (bản cập nhật từ ZIP người dùng gửi)
+
+1. Sao chép .env.local từ bản đang chạy vào thư mục dự án mới.
+2. npm install
+3. npm run dev
+4. Đăng nhập ADMIN, chọn Final, nhấn 'Tải Final mới nhất'.
+
+ĐÃ SỬA
+- Final tổng hợp trực tiếp DSCL + PHAN_CONG + CT_KV + DIEU_CHINH, mỗi mã SP đúng 1 dòng.
+- Chỉnh nhiều lần cùng một CT_KV: lấy bản ghi mới nhất theo created_at/id; không cộng tất cả các lần.
+- Khu vực mới: tính một lần theo ID, cập nhật sau lấy số mới nhất.
+- Trạng thái Đã kiểm / Chưa kiểm lấy từ PHAN_CONG.
+- Trang nhân viên bỏ nút 'Lưu và giữ Chưa kiểm'; sửa phép tính +/- không cộng trùng lịch sử.
+- Không xóa dữ liệu gốc, không ghi vào bảng final_lines.
+
+LƯU Ý
+- Chỉ hiển thị Final cho ADMIN trong phiên bản này. Cần quyền RLS đọc bảng DSCL, CT_KV, DIEU_CHINH, PHAN_CONG cho ADMIN như hiện có.
+- Bảng Final là bản tính khi tải trang / bấm tải lại, không phải realtime subscription. Khi nhân viên lưu, Admin bấm 'Tải Final mới nhất' để thấy ngay kết quả.
+- GT chênh lệch mới là ước tính theo đơn giá suy ra từ GT chênh lệch cũ / chênh lệch cũ; nếu chênh lệch cũ = 0 thì không suy ra được.
+- Các bản ghi sửa BC chưa có ct_kv_id chưa thể hợp nhất an toàn; chức năng lưu BC vẫn có giới hạn từ bản gốc.
+- Quyền RLS và quy trình lưu nhiều bảng chưa có transaction nguyên tử; nếu lưu thất bại giữa chừng, kiểm tra dữ liệu trước khi bấm lại.
+- Chưa kiểm thử trực tiếp trên dự án Supabase của bạn. Trong môi trường đóng gói này không cài được npm dependencies để chạy vite build; hãy chạy npm install và npm run build trên máy của bạn.

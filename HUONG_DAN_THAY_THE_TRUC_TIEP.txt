@@ -1,0 +1,15 @@
+V10 - Thay thế trực tiếp DSCL / CT_KV / BC (không staging)
+
+1. Sao lưu database Supabase.
+2. SQL Editor: chạy toàn bộ SUPABASE_REPLACE_DIRECT.sql MỘT LẦN.
+3. Chép đè src/upload.js và src/main.jsx (hoặc dùng toàn bộ ZIP này).
+4. Trong thư mục dự án: npm install; npm run dev.
+5. Upload Excel và kiểm tra bảng xem trước, nhất là CT_KV đủ 8 cột.
+6. Nhấn Xác nhận thay thế. Một RPC gửi toàn bộ file; backend xóa và thêm trong cùng transaction.
+7. Kiểm tra SELECT COUNT(*) FROM public.ct_kv;
+
+LƯU Ý: Không xóa bảng v10_upload_stage cũ để còn dữ liệu phục hồi.
+RPC một lần có giới hạn kích thước request/timeouts; nếu file quá lớn có thể thất bại mà không thay đổi bảng chính.
+Nếu bảng có khóa ngoại tham chiếu, DELETE có thể bị chặn và rollback.
+Nếu tiêu đề file Excel không trùng alias thì ứng dụng báo thiếu cột, không thay thế dữ liệu.
+Không sử dụng service_role key trong trình duyệt.

@@ -1,0 +1,7 @@
+V10 - QUET BARCODE TU DONG +/-
+1. Dang nhap nhan vien, mo Quet Barcode, chon che do Cong hoac Tru.
+2. Quet barcode CT_KV: chi tu dong +/- 1 neu DVT nhap trung DVT co ban DSCL.
+3. Neu mot barcode co nhieu KV, chon dung dong KV tai Quet nhanh roi quet lai.
+4. Neu barcode co DVT khac DVT co ban: dung va can he so quy doi xac thuc; KHONG tu suy doan.
+5. Moi lan quet thay doi gia tri +/- trong bo nho; bam Cap nhat da kiem de luu.
+6. Chua kiem thu build React va ket noi Supabase tren moi truong nguoi dung.

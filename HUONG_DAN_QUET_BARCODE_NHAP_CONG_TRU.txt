@@ -1,0 +1,17 @@
+V10 - QUÉT BARCODE VÀ NHẬP +/- THEO ĐVT CƠ BẢN
+
+1. Sao chép .env.local từ bản V10 cũ sang thư mục dự án.
+2. npm install
+3. npm run dev
+4. Đăng nhập nhân viên > quét/nhập Barcode hoặc mã SP.
+5. Ứng dụng tìm Barcode trong CT_KV rồi BC, chỉ trong mã SP được phân công.
+6. Mở chi tiết mã SP; dòng có Barcode tương ứng được tô nền nhạt.
+7. Nhập +/- tại từng dòng theo ĐVT cơ bản của DSCL, không nhập SL thực tế.
+8. SL cuối = SL gốc từng dòng + mức +/- cuối cùng. Bấm Cập nhật đã kiểm.
+9. Sửa lại +/- cùng dòng sẽ thay thế mức trước, không cộng dồn lịch sử.
+
+Lưu ý:
+- Camera chỉ hỗ trợ trình duyệt có BarcodeDetector và quyền camera trên HTTPS/localhost. Có ô nhập Barcode để dự phòng.
+- Mã có nhiều khu vực: cần kiểm tra đúng dòng khu vực trước khi cập nhật; quét Barcode chỉ chọn mã SP, không tự chọn KV nếu nhiều KV trùng Barcode.
+- CT_KV gốc không bị sửa; điều chỉnh lưu vào DIEU_CHINH.
+- Chưa kiểm thử được kết nối Supabase thực tế. Chức năng lưu nhiều dòng vẫn không nguyên tử.

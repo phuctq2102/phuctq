@@ -1,0 +1,10 @@
+V10 - SỬA SL ĐẾM DSCL (2AU8)
+
+1. Sao lưu Supabase trước khi thay đổi.
+2. Trong Supabase SQL Editor, chạy toàn bộ SUPABASE_REPLACE_DIRECT.sql trong ZIP để cập nhật RPC (không xóa dữ liệu khi cài RPC).
+3. Giữ nguyên .env.local của bản đang chạy. Giải nén, chạy npm install rồi npm run dev.
+4. Upload lại file 2AU8_DSCL.xlsx từ trang DSCL. Upload sẽ thay thế bảng DSCL khi toàn bộ file hợp lệ.
+5. Ứng dụng kiểm tra một mã có SL đếm khác 0 ngay sau upload; nếu RPC còn sai, báo lỗi rõ.
+6. Chạy SELECT ma_sp, sl_dem FROM public.dscl WHERE ma_sp = '10171315'; kết quả kỳ vọng 1.
+
+Lưu ý: Không chạy mã JavaScript trong SQL Editor. Không tự xóa bảng. Các bảng phân công/điều chỉnh có thể bị ảnh hưởng bởi thay thế DSCL nếu ràng buộc FK tồn tại: sao lưu trước.

@@ -1,0 +1,12 @@
+HUONG DAN UPLOAD GITHUB VA VERCEL
+
+1. Giai nen file ZIP nay tren may tinh.
+2. Mo thu muc vua giai nen, chon cac file va thu muc ben trong (package.json, src, supabase, index.html,...).
+3. Tren GitHub > repository > Add file > Upload files, keo tha cac file/thư muc DA GIAI NEN (KHONG upload file ZIP).
+4. Commit changes. Khuyen nghi repository PRIVATE.
+5. Vercel > New Project > Import Git Repository > Framework Vite > Build npm run build > Output dist.
+6. Vercel > Environment Variables: nhap cac bien VITE_SUPABASE_* theo src/supabase.js. Tuyet doi khong nhap service_role key.
+7. Kiem tra login Admin/MNV, Final, QR, phan quyen va RPC truoc khi su dung that.
+8. Khong upload .env.local hoac node_modules.
+
+Luu y: File nay chi don dep nguon de deploy, khong sua logic ung dung.

@@ -1,0 +1,18 @@
+FIX LOI: Could not find function public.v10_auto_assign
+
+1. Sao luu database Supabase truoc khi thay doi.
+2. Vao Supabase Dashboard > SQL Editor, dung project dang duoc React ket noi.
+3. Mo file V10_PHAN_CONG_RPC.sql trong thu muc nay, copy TOAN BO noi dung, paste vao SQL Editor va bam Run.
+4. Neu SQL thanh cong, chay: NOTIFY pgrst, 'reload schema';
+5. Kiem tra:
+   SELECT p.proname, pg_get_function_identity_arguments(p.oid)
+   FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+   WHERE n.nspname='public' AND p.proname='v10_auto_assign';
+   Phai tra ve mot ham co p_employee_count integer, p_threshold numeric.
+6. Tai lai localhost:5173, kiem tra nguong 300000, so NV 10, bam Phan cong tu dong.
+
+QUAN TRONG:
+- SQL co DROP FUNCTION IF EXISTS public.v10_auto_assign(integer) (chi xoa overload cu 1 tham so), KHONG xoa bang du lieu.
+- Phan cong lai cac ma CHUA KIEM du ngưong; giu nguyen ma DA KIEM.
+- File ZIP khong tu dong cai SQL. Khong duoc copy SQL vao JavaScript hay terminal npm.
+- Chua kiem thu ket noi truc tiep voi Supabase production.

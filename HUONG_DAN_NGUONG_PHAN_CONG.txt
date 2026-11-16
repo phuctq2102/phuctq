@@ -1,0 +1,12 @@
+V10 - PHAN CONG THEO NGUONG 300000 VNĐ
+
+1. Sao luu database Supabase.
+2. Supabase SQL Editor: chay file V10_PHAN_CONG_RPC.sql.
+3. Chay npm install va npm run dev.
+4. Vao Danh sach ma hang -> Phan cong ma hang V1.
+5. Nhap nguong 300000, so nhan vien 10, bam Phan cong tu dong.
+6. Chi ma co ABS(gt_chenh_lech)>=nguong duoc phan cong; ma Da kiem giu nguyen.
+7. MNV duoc chia 001..010 theo Nganh hang A-Z -> Ten san pham A-Z.
+8. Tai mau phan cong Excel cung theo nguong dang nhap.
+
+CHU Y: SQL nay thay doi RPC phan cong, khong xoa du lieu bang. Tai khoan Supabase Auth MNV chua duoc tao tu dong. Chua kiem thu truc tiep tren Supabase production.

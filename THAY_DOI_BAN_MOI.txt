@@ -1,0 +1,6 @@
+BAN ZIP MOI - 16/11/2026
+1. Bo sung sl_dem trong cot DSCL tai man hinh bang.
+2. Thong nhat trang_thai_duyet khi gui dieu chinh voi gia tri hien co: Khong can duyet.
+3. Chon BC khi sl_dem goc DSCL = 0, thay vi dua vao tong ct_kv.
+4. Khong kem node_modules; can npm install truoc khi chay.
+CANH BAO: Chua co RPC atomic luu dieu chinh/phan_cong/Final; chua la ban san xuat. Khong thay the ung dung dang chay neu chua backup va test.

@@ -1,0 +1,12 @@
+V10 - SUA FINAL TAI CHAM / DUNG O 'DANG TONG HOP FINAL'
+
+Thay doi trong src/FinalView.jsx:
+- Lay DIEU_CHINH truoc, chi tai DSCL / CT_KV / BC / PHAN_CONG / ADMIN_FINAL_CHECK cua cac ma co dieu chinh.
+- Lay du lieu theo nhom 80 ma, tranh tai toan bo CT_KV hang nghin dong.
+- Hien loi neu truy van Supabase that bai; gioi han cho 30 giay.
+- Giu logic Final mot ma mot dong, QR va xem chi tiet Admin.
+
+Cai dat: giai nen, chep .env.local tu ban cu, npm install, npm run dev.
+Khong can chay SQL moi neu 03_NANG_CAP_ADMIN_FINAL_CHECK.sql da chay thanh cong.
+
+Luu y: Chua kiem thu build/kết noi Supabase do moi truong khong tai duoc npm dependencies. Hay thu tren du lieu kiem thu truoc.

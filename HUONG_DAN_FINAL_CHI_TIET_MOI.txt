@@ -1,0 +1,9 @@
+V10 Final / QR - Chi tiet sau kiem
+1. Chay 03_NANG_CAP_ADMIN_FINAL_CHECK.sql trong Supabase SQL Editor (mot lan).
+2. Giu lai .env.local cu; npm install; npm run dev.
+3. Final chi hien ma co thay doi SL rong; xem chi tiet hien KV cu, KV moi va SL cuoi cung.
+4. Sua SL cung CT_KV: lay ban ghi moi nhat theo updated_at/id.
+5. THEM_KV cu khong co ma_dong_moi: coi cung ma SP + ten KV (khong phan biet hoa thuong) la cung mot KV, lay lan moi nhat. Neu thuc te co hai KV doc lap cung ten, can bo sung ID KV rieng.
+6. Xac nhan Admin can cot revision, confirmed_at, confirmed_by trong admin_final_check.
+7. QR CT_KV doi chieu dvt_nhap voi DSCL.dvt_co_ban, sau do BC, sau cung ma SP.
+8. Chua kiem thu ket noi Supabase thuc te; GT chenh lech moi van la uoc tinh.

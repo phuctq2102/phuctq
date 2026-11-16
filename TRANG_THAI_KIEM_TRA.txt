@@ -1,0 +1,17 @@
+V10 - BAN SUA GIAO DIEN THEM KV / LOGIC DOC (16-11-2026)
+
+Da sua:
+- Them KV chi nhap Khu vuc va SL thuc te (quy doi); bo o Barcode.
+- Chon BC khi tong SL dem CT_KV cua ma = 0, thay vi dua vao DSCL.
+- Khong cong cac dieu chinh cho duyet / tu choi vao tong SL.
+- Su dung trang thai 'Khong can duyet' cho dieu chinh luu truc tiep.
+
+CHUA HOAN THANH / KHONG DUOC COI LA BAN SAN SANG SAN XUAT:
+- Luu nhieu dong hien thuc hien qua nhieu lenh REST, KHONG atomic.
+- RLS hien tai chi cho Admin doc/ghi cac bang nguon va dieu_chinh; nhan vien se bi chan.
+- Chua co RPC dong bo final_lines va audit_log.
+- Chua kiem thu ket noi Supabase thuc te.
+- Chua build duoc trong moi truong nay (thieu vite executable).
+- File SQL kem theo chi la ban nguon, CHUA DUOC CHAY tren Supabase.
+
+Hay backup database va kiem thu tren du an Supabase thu nghiem truoc khi su dung.

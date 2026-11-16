@@ -1,0 +1,8 @@
+V10 FIX: SL đếm DSCL + Thêm KV (không ĐVT) + BC.
+1. Sao lưu Supabase trước khi thực hiện.
+2. Chạy 01_CHAY_MOT_LAN_DSCL_SL_DEM.sql trong SQL Editor.
+3. Chạy lại SUPABASE_REPLACE_DIRECT.sql để RPC nhận sl_dem DSCL.
+4. Khởi động web (npm install, npm run dev), upload lại file DSCL gốc. Chỉ upload DSCL sau khi đã sao lưu.
+5. Thêm KV: Khu vực, Barcode, SL thực tế quy đổi; lưu DIEU_CHINH khi Cập nhật đã kiểm.
+6. Chú ý: thao tác lưu phụ thuộc schema/RLS của DIEU_CHINH và PHAN_CONG. Chưa kiểm thử trên Supabase thật; không khẳng định Final đồng bộ tự động.
+7. Các bản ghi điều chỉnh trước đó có thể đã ghi sai; cần kiểm tra trước khi dùng thực tế.

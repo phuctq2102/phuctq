@@ -1,0 +1,22 @@
+V10 React + Supabase - Upload thay thế DSCL / CT_KV / BC
+
+1. Sao lưu database. Không xóa bảng backup DSCL hiện có.
+2. Đối chiếu tên cột của CT_KV và BC với SQL; nếu khác, KHÔNG chạy SQL chưa điều chỉnh.
+3. Trong Supabase SQL Editor chạy file SUPABASE_UPLOAD_SETUP.sql một lần.
+4. Tại thư mục dự án, tạo .env.local từ .env.example và điền URL + publishable key của bạn.
+   Không dùng service_role. File .env.local cũ KHÔNG được đóng gói trong ZIP này.
+5. Chạy npm install, npm run dev. Đăng nhập Admin.
+6. Chọn DSCL, CT_KV hoặc BC; chọn Excel; kiểm tra bản xem trước; xác nhận thay thế.
+7. Khi tải lên, dữ liệu được đưa vào staging theo lô 250 dòng. Chỉ bước commit RPC mới
+   thay bảng thật trong một transaction. Nếu commit lỗi, bảng thật không bị thay một phần.
+8. Sau khi chạy, kiểm tra số dòng và dữ liệu trên Supabase và ứng dụng.
+
+LƯU Ý:
+- Không triển khai SQL lên production trước khi kiểm tra tên cột, quyền, RLS, khóa ngoại,
+  trigger và các logic liên kết ct_kv.id của dự án thực tế.
+- Khi thay CT_KV hoặc BC, id dòng có thể thay đổi. Dữ liệu ở bảng khác không bị xóa trực tiếp
+  nhưng các tham chiếu nghiệp vụ đến ID cũ có thể không còn đúng.
+- DSCL giữ id mã cũ, nhưng du_lieu_goc không được nhập từ Excel trong bản này;
+  trường này của mã cũ giữ nguyên, mã mới nhận giá trị mặc định NULL.
+- Cần kiểm tra Excel header mapping: cột không nhận diện được không được nhập.
+- File này là bản khởi tạo V10 React, chưa phải đầy đủ chức năng V10 Fast.

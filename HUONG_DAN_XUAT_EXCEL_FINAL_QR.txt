@@ -1,0 +1,11 @@
+V10 - XUẤT EXCEL FINAL + QR CODE
+
+1. Giải nén ZIP và dùng thư mục V10_React_Supabase_Upload_Safe thay cho mã nguồn V10 hiện tại.
+2. Mở terminal tại thư mục dự án, chạy npm install (nếu chưa cài), sau đó npm run dev.
+3. Đăng nhập ADMIN, mở Final, bấm Tải Final mới nhất, rồi bấm Xuất Excel + QR.
+4. File Excel có đầy đủ cột Final, trạng thái Admin, Barcode/QR và ảnh QR nhúng (có thể in).
+5. Excel chỉ xuất các mã theo bộ lọc đang chọn, trên tất cả các trang.
+6. Để nhúng ảnh QR, máy cần Internet truy cập cdn.jsdelivr.net và api.qrserver.com.
+7. Nếu mạng chặn CDN hoặc ảnh QR, V10 sẽ xuất Excel dự phòng chỉ có dữ liệu và link QR, kèm cảnh báo. Không nhầm bản dự phòng với file có QR nhúng.
+8. QR dùng đúng giá trị đang hiển thị trên V10. Việc quét tự động nhập số lượng phụ thuộc định dạng mà app công ty hỗ trợ.
+9. Không có thay đổi SQL, Supabase, Đóng sổ, Bắt đầu kỳ mới, BC hoặc logic tính Final.

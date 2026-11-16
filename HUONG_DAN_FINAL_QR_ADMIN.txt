@@ -1,0 +1,12 @@
+FINAL / QR / ADMIN - V10
+
+1. Mở Supabase SQL Editor và chạy 02_ADMIN_FINAL_CHECK.sql đúng một lần.
+2. Giữ file .env.local của phiên bản đang chạy; sao chép vào thư mục dự án mới.
+3. npm install; npm run dev.
+4. Final chỉ hiện mã có thay đổi số lượng RÒNG khác 0, mỗi mã một dòng.
+5. QR: ĐVT cơ bản DSCL -> CT_KV.dvt_nhap + barcode -> BC.dvt_co_ban + barcode -> ma_sp.
+6. Nếu nhiều Barcode hợp lệ cùng nguồn, phiên bản này lấy Barcode đầu tiên.
+7. Admin xác nhận trực tiếp ở mỗi dòng Final. Nhân viên sửa dữ liệu sau xác nhận thì Final chuyển Chưa kiểm khi tải lại.
+8. QR hiện qua dịch vụ api.qrserver.com: máy cần Internet; nội dung mã Barcode/mã SP sẽ được gửi tới dịch vụ này. Không dùng nếu dữ liệu Barcode cần giữ kín hoặc môi trường không có Internet.
+9. Chưa xác nhận được chạy build/kiểm thử Supabase trong môi trường đóng gói; cần kiểm thử tại hệ thống thực tế.
+10. GT chênh lệch mới vẫn là ước tính theo đơn giá suy từ DSCL, chưa phải giá trị kế toán xác nhận.
