@@ -1,0 +1,13 @@
+V10 - RESET MAT KHAU MOI VAI TRO
+
+1. Supabase Dashboard > Edge Functions > Create Function: admin-reset-password
+   Dan toan bo noi dung supabase/functions/admin-reset-password/index.ts, Deploy.
+   Settings: Verify JWT with legacy secret = OFF (function tu xac minh access token).
+2. Supabase Edge Functions > manage-mnv > Code: thay bang file manage-mnv/index.ts trong ZIP, Deploy.
+3. GitHub: thay src/main.jsx bang file trong ZIP, commit. Vercel: redeploy Production.
+4. Dang nhap ADMIN > Mat khau > Tai danh sach tai khoan > Chon tai khoan > Nhap mat khau moi >=12 ky tu > Dat lai.
+5. Nhan vien dang nhap duoc co the tu doi mat khau tai muc Mat khau.
+
+Luu y: Khong doi role, khong xoa tai khoan, khong thay doi du lieu kiem ke.
+Can ADMIN dang nhap duoc de dung tinh nang nay. Neu ADMIN khong dang nhap duoc, phai sua login truoc hoac dung Supabase Dashboard/secure server de khoi phuc.
+Can thu hoi service_role key da lo trong chat va tao lai; khong dua key vao GitHub/Vercel client.
