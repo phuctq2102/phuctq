@@ -47,4 +47,3 @@
 - Chưa thể xác nhận mapping thực tế của các trường DSCL, cách tính GT chênh lệch, hoặc schema RLS. Chênh lệch hiển thị được tính từ SL đếm - SL sổ; GT chênh lệch lấy độ lớn từ trường hiện có và dấu theo số lượng, cần kiểm thử.
 - Bộ lọc trạng thái chỉ lọc 50 mã đã tải. Ngưỡng GT chênh lệch áp dụng phía server, tìm kiếm mã/tên phía server.
 - Chưa kiểm thử npm build do môi trường không cài được dependencies; chạy npm install và npm run build trên máy của bạn để kiểm tra.
-Deploy Web App V10 to Vercel
