@@ -17,7 +17,15 @@ export default function InventoryList({admin,profile,onMessage}){
  useEffect(()=>{let active=true;async function readAll(table,columns){const out=[];for(let start=0;start<100000;start+=1000){const {data,error}=await supabase.from(table).select(columns).range(start,start+999);if(error)throw error;out.push(...(data||[]));if((data||[]).length<1000)break;}return out}
  (async()=>{try{const [ct,bc]=await Promise.all([readAll('ct_kv','ma_sp,barcode,khu_vuc,dvt_nhap'),readAll('bc','ma_sp,barcode,khu_vuc,dvt_co_ban')]);if(!active)return;setBarcodeRows([...ct.map(x=>({...x,_source:'CT_KV'})),...bc.map(x=>({...x,_source:'BC'}))]);setKvOptions([...new Set([...ct,...bc].map(x=>txt(x.khu_vuc)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')));setBarcodeError('')}catch(e){if(active){setBarcodeRows([]);setBarcodeError('Không tải được Barcode/KV: '+e.message)}}})();return()=>{active=false}},[refresh]);
  const sourceByProduct=useMemo(()=>{const map=new Map();for(const r of barcodeRows){const k=txt(r.ma_sp);if(!k)continue;if(!map.has(k))map.set(k,[]);map.get(k).push(r)}return map},[barcodeRows]);
- const barcodesFor=r=>[...new Set((sourceByProduct.get(txt(r.ma_sp))||[]).filter(x=>norm(x._source==='BC'?x.dvt_co_ban:x.dvt_nhap)===norm(r.dvt_co_ban)&&norm(r.dvt_co_ban)).flatMap(x=>barcodeParts(x.barcode)))].join('; ');
+ // Chỉ lấy Barcode đúng ĐVT cơ bản DSCL. CT_KV ưu tiên; BC chỉ là nguồn dự phòng.
+ const barcodesFor=r=>{
+  const unit=norm(r.dvt_co_ban);
+  if(!unit)return '';
+  const rows=sourceByProduct.get(txt(r.ma_sp))||[];
+  const valid=(source)=>[...new Set(rows.filter(x=>x._source===source && norm(source==='CT_KV'?x.dvt_nhap:x.dvt_co_ban)===unit).flatMap(x=>barcodeParts(x.barcode)))];
+  const ct=valid('CT_KV');
+  return (ct.length?ct:valid('BC')).join('; ');
+ };
  // Query server-side for DSCL; no writes to source tables.
  useEffect(()=>{let alive=true;async function run(){setBusy(true);setError('');try{
   let q=supabase.from('dscl').select('*',{count:'exact'});
