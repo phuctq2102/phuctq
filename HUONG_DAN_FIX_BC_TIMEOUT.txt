@@ -1,0 +1,9 @@
+SỬA LỖI THAY THẾ BC - V10
+1. Sao lưu bảng public.bc trước khi thay đổi.
+2. Supabase > SQL Editor > chạy TOÀN BỘ BC_UPLOAD_BATCH_SAFE.sql.
+3. Deploy lại thư mục phuctq-main lên Vercel như bản trước.
+4. Đăng nhập Admin > Barcode bổ sung > chọn file Excel > xác nhận thay thế.
+5. Upload chia lô 5.000 dòng. BC cũ vẫn giữ nguyên cho đến bước hoàn tất.
+6. Nếu bước hoàn tất vẫn timeout do giới hạn Supabase/PostgREST hoặc do index/trigger, BC cũ rollback. Cần xem database logs và tối ưu thêm, không bấm xóa thủ công.
+LƯU Ý: dữ liệu tạm của lần upload bị gián đoạn trước khi hoàn tất có thể tồn tại; có thể dọn bản ghi cũ trong v10_bc_upload_stage sau khi kiểm tra.
+Không thay đổi quy trình DSCL/CT_KV và các màn hình khác.
