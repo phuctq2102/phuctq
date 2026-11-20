@@ -56,10 +56,21 @@ export default function InventoryList({admin,profile,onMessage}){
   }
   const visibleMap=new Map();
   for(const x of visibleBarcodeRows){const k=txt(x.ma_sp);if(!visibleMap.has(k))visibleMap.set(k,[]);visibleMap.get(k).push(x)}
-  const barcodeForVisible=(r,count)=>[...new Set((visibleMap.get(txt(r.ma_sp))||[])
-   .filter(x=>x._source===(count>0?'CT_KV':'BC')&&norm(x._source==='CT_KV'?x.dvt_nhap:x.dvt_co_ban)===norm(r.dvt_co_ban))
-   .flatMap(x=>barcodeParts(x.barcode)))].join('; ');
-  const result=base.map(r=>({...r,_assignment:map.get(txt(r.ma_sp))||null,_currentCount:baseCount(r)+(totals.get(txt(r.ma_sp))||0),_barcodes:barcodeForVisible(r,baseCount(r)+(totals.get(txt(r.ma_sp))||0))})).filter(r=>!term||txt(r.ma_sp).toLowerCase().includes(term.toLowerCase())||txt(r.ten_sp).toLowerCase().includes(term.toLowerCase())||r._barcodes.toLowerCase().includes(term.toLowerCase()));
+  // Match by the original DSCL counted quantity, not by subsequent employee adjustments.
+  // A missing barcode in CT_KV is NOT silently replaced with BC for positive counts.
+  const barcodeForVisible=(r)=>{
+   const source=baseCount(r)>0?'CT_KV':'BC';
+   const unit=norm(r.dvt_co_ban);
+   const matches=(visibleMap.get(txt(r.ma_sp))||[]).filter(x=>
+    x._source===source && unit && norm(source==='CT_KV'?x.dvt_nhap:x.dvt_co_ban)===unit
+   );
+   return [...new Set(matches.flatMap(x=>barcodeParts(x.barcode)))].join('; ');
+  };
+  const result=base.map(r=>({...r,_assignment:map.get(txt(r.ma_sp))||null,_currentCount:baseCount(r)+(totals.get(txt(r.ma_sp))||0),_barcodes:barcodeForVisible(r)})).filter(r=>!term||txt(r.ma_sp).toLowerCase().includes(term.toLowerCase())||txt(r.ten_sp).toLowerCase().includes(term.toLowerCase())||r._barcodes.toLowerCase().includes(term.toLowerCase()));
+  // Diagnostics for records that should have a barcode but are not returned to the browser.
+  if(import.meta.env.DEV){for(const r of result.filter(x=>!x._barcodes).slice(0,10)){
+   console.debug('[Barcode DS_ma_hang]',{ma_sp:r.ma_sp,sl_dem:baseCount(r),dvt_dscl:r.dvt_co_ban,source:baseCount(r)>0?'CT_KV':'BC',received:visibleMap.get(txt(r.ma_sp))||[]});
+  }}
   if(alive){setItems(result);setTotal(count||0)}
  }catch(e){if(alive){setItems([]);setTotal(0);setError(e.message)}}finally{if(alive)setBusy(false)}}run();return()=>{alive=false}},[page,search,threshold,materialGroup,kv,sourceByProduct,refresh]);
  const shown=useMemo(()=>items.filter(r=>state==='all'||status(r._assignment?.trang_thai)===state),[items,state]);
