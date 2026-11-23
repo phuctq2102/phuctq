@@ -28,10 +28,10 @@ export function summarizeFinal(assignments,products,corrections,ctRows){
  for(const a of assignments){
   const code=key(a.ma_sp);if(!code)continue;
   const p=products.get(code)||{};
-  const changes=(byProduct.get(code)||[]).slice().sort((a,b)=>stamp(a).localeCompare(stamp(b))||key(a.id).localeCompare(key(b.id)));
+  const changes=(byProduct.get(code)||[]).slice().sort((a,b)=>stamp(a).localeCompare(stamp(b))||number(a.id)-number(b.id));
   const latest=new Map(),additions=new Map(),first=new Map();
   for(const c of changes){
-   if(isNew(c)){const identity=key(c.ma_dong_moi)||('kv:'+norm(c.khu_vuc_moi));additions.set(identity,c);continue;}
+   if(isNew(c)){const identity=key(c.ma_dong_moi)||('id:'+key(c.id));additions.set(identity,c);continue;}
    const id=key(c.ct_kv_id);
    if(id){if(!first.has(id))first.set(id,c);latest.set(id,c);}
    else if(c.id!=null)latest.set('unlinked:'+key(c.id),c);
@@ -59,7 +59,7 @@ export function buildDetails(ctRows,corrections){
  const byCode=new Map(),latest=new Map(),newAreas=new Map();
  for(const r of ctRows){const code=key(r.ma_sp);if(!byCode.has(code))byCode.set(code,[]);byCode.get(code).push(r);}
  const ordered=corrections.filter(valid).slice().sort((a,b)=>stamp(a).localeCompare(stamp(b))||number(a.id)-number(b.id));
- for(const c of ordered){const code=key(c.ma_sp);if(isNew(c)){if(!newAreas.has(code))newAreas.set(code,new Map());newAreas.get(code).set(key(c.ma_dong_moi)||('kv:'+norm(c.khu_vuc_moi)),c);}else if(key(c.ct_kv_id)){latest.set(code+':'+key(c.ct_kv_id),c);}}
+ for(const c of ordered){const code=key(c.ma_sp);if(isNew(c)){if(!newAreas.has(code))newAreas.set(code,new Map());newAreas.get(code).set(key(c.ma_dong_moi)||('id:'+key(c.id)),c);}else if(key(c.ct_kv_id)){latest.set(code+':'+key(c.ct_kv_id),c);}}
  const result=new Map();
  for(const code of new Set([...byCode.keys(),...newAreas.keys()])){
   const lines=(byCode.get(code)||[]).map(r=>{const c=latest.get(code+':'+key(r.id));const base=number(r.sl_dem),actual=c?number(c.sl_moi):base;return {identity:'ct:'+r.id,source:'CT_KV',barcode:r.barcode,kv:c?.khu_vuc_moi||r.khu_vuc,dvt:r.dvt_nhap,sl_nhap:r.sl_nhap,base,actual,delta:actual-base};});
@@ -110,7 +110,7 @@ export default function FinalView(){
   }catch(e){setError('Không tải được Final: '+(e?.message||String(e)));setRows([])}
   finally{setBusy(false)}
  }
- useEffect(()=>{reload()},[]);
+ useEffect(()=>{reload();const onFocus=()=>reload();window.addEventListener('focus',onFocus);return()=>window.removeEventListener('focus',onFocus)},[]);
  const adminStatus=r=>approvals.get(r.ma_sp)?.revision===signature(r)?'Đã kiểm':'Chưa kiểm';
  async function confirmAdmin(r){
   setBusy(true);setError('');try{
