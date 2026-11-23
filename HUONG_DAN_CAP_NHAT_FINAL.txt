@@ -1,0 +1,8 @@
+V10 - DONG BO ADMIN / FINAL / NHAN VIEN
+1. Supabase > SQL Editor: chay V10_FINAL_ADMIN_EDIT.sql MOT LAN.
+   Yeu cau trigger v10_final_on_correction hien co dang hoat dong.
+2. Dua ma nguon len GitHub, Vercel se build va deploy.
+3. Admin > Danh sach ma hang: sua SL va bam Cap nhat da kiem.
+4. Admin > Final: sua SL dem moi truc tiep tren dong va bam Luu.
+5. Nhan vien: bo hoan toan khoi Quet nhanh +/- SL va Camera; giu sua SL theo KV.
+Luu y: chua kiem thu ket noi voi Supabase thuc te; can kiem tra RLS/trigger tren du an.
