@@ -90,9 +90,17 @@ export default function InventoryList({admin,profile,onMessage}){
   const {data:assignment,error:findError}=await supabase.from('phan_cong').select('ma_sp').eq('ma_sp',selected.ma_sp).maybeSingle();if(findError)throw findError;
   if(assignment){const {error}=await supabase.from('phan_cong').update({trang_thai:'Đã kiểm'}).eq('ma_sp',selected.ma_sp);if(error)throw error;}
   if(changed.length||(kv&&raw!=='')){
+   // Admin explicitly refreshes the canonical snapshot. A missing trigger must
+   // not be silently mistaken for successful synchronization.
+   if(admin){
+    const {error:refreshError}=await supabase.rpc('v10_admin_refresh_final',{p_ma_sp:selected.ma_sp});
+    if(refreshError)throw Error('Đã lưu điều chỉnh nhưng chưa đồng bộ Final: '+refreshError.message+' (chạy SQL V10_SYNC_FIX_20261123.sql)');
+   }
+   const expected=currentCount(selected)+delta;
    const {data:sync,error:syncError}=await supabase.from('final_lines').select('sl_dem').eq('ma_sp',selected.ma_sp).maybeSingle();
-   if(syncError)throw Error('Đã ghi điều chỉnh nhưng chưa xác minh được Final: '+syncError.message);
-   if(!sync)throw Error('Đã ghi điều chỉnh nhưng Final chưa có mã. Kiểm tra trigger v10_final_on_correction trong Supabase.');
+   if(syncError)throw Error('Không xác minh được Final: '+syncError.message);
+   if(Math.abs(expected-baseCount(selected))>1e-9 && (!sync||Math.abs(Number(sync.sl_dem)-expected)>1e-7))
+    throw Error('Final chưa khớp: mong đợi '+expected+', hiện tại '+(sync?.sl_dem??'không có dòng')+'. Kiểm tra SQL đồng bộ.');
   }
   onMessage('Đã lưu số lượng, KV mới và trạng thái Đã kiểm.');setSelected(null);setRefresh(x=>x+1);
  }catch(e){onMessage('Không cập nhật được: '+e.message)}finally{setSaving(false)}}

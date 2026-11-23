@@ -1,0 +1,6 @@
+1. Supabase SQL Editor: run V10_SYNC_FIX_20261123.sql once as database owner.
+2. Upload the contents of phuctq-main (not the folder itself) to GitHub main.
+3. Wait for Vercel Ready, hard-refresh Ctrl+Shift+R.
+4. Admin: edit one CT_KV quantity in Danh sach ma hang, save; check Final.
+5. Admin: edit quantity directly in Final, click Luu; check Danh sach ma hang and employee after refresh.
+6. A failed sync now shows an explicit error, not false success.
