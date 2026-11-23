@@ -272,9 +272,50 @@ export default function FinalView(){
   <div className="tablewrap final-table"><table style={{whiteSpace:"normal"}}><thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th>MNV</th><th>SL đếm gốc</th><th>SL trên sổ</th><th>Chênh lệch cũ</th><th>GT lệch cũ</th><th>+/- QĐ</th><th>SL đếm mới</th><th>Chênh lệch mới</th><th>GT lệch mới*</th><th>Trạng thái Admin</th><th>QR</th><th>Xác nhận Admin</th><th>Chi tiết</th></tr></thead><tbody>{filtered.slice(page*100,(page+1)*100).map(r=><tr key={r.ma_sp}><td><b>{r.ma_sp}</b></td><td className="inv-name" style={{minWidth:170,maxWidth:280,whiteSpace:"normal",overflowWrap:"anywhere",verticalAlign:"middle"}}>{r.ten_sp}</td><td>{r.mnv}</td><td>{fmt(r.sl_goc)}</td><td>{fmt(r.sl_so)}</td><td>{fmt(r.chenh_cu)}</td><td>{fmt(r.gt_cu)}</td><td className={r.delta<0?'negative':r.delta>0?'positive':''}>{fmt(r.delta)}</td><td>{fmt(r.sl_moi)}</td><td className={r.chenh_moi<0?'negative':'positive'}>{fmt(r.chenh_moi)}</td><td>{r.gt_moi===null?'—':fmt(r.gt_moi)}</td><td><span className={'inv-status '+(adminStatus(r)==='Đã kiểm'?'done':'pending')}>{adminStatus(r)}</span></td><td><img src={qrUrl(r)} alt={'QR '+r.qr_value} width="72" height="72" loading="lazy"/><div style={{fontSize:10,overflowWrap:'anywhere',maxWidth:130}}>{r.qr_value}</div></td><td><button className="small" disabled={busy||adminStatus(r)==='Đã kiểm'} onClick={()=>confirmAdmin(r)}>Xác nhận đã kiểm</button></td><td><button className="small" onClick={()=>openDetail(r)}>Xem</button></td></tr>)}</tbody></table>{!busy&&!filtered.length&&<p className="empty">Không có mã phù hợp</p>}</div>
   <div className="pager"><button className="outline" disabled={page===0} onClick={()=>setPage(v=>v-1)}>Trước</button><span>Trang {page+1}/{Math.max(1,Math.ceil(filtered.length/100))}</span><button className="outline" disabled={(page+1)*100>=filtered.length} onClick={()=>setPage(v=>v+1)}>Sau</button></div>
   <p className="inv-hint">* GT lệch mới là ước tính theo đơn giá suy ra từ DSCL; nếu chênh lệch cũ bằng 0 thì để trống. Final chỉ hiển thị mã có thay đổi SL ròng khác 0; trạng thái xác nhận riêng của Admin. QR sử dụng dịch vụ ảnh bên ngoài, cần kết nối Internet. Nút xuất Excel + QR tải toàn bộ các mã theo bộ lọc hiện tại, không chỉ trang đang xem. File QR nhúng cần ExcelJS từ CDN và ảnh QR tải được qua Internet.</p></div>
-  {selected&&<div className="overlay" onClick={()=>setSelected(null)}><div className="panel modal" onClick={e=>e.stopPropagation()}><div className="modalhead"><h2>Final · {selected.ma_sp}</h2><button className="outline" onClick={()=>setSelected(null)}>Đóng</button></div><h3>{selected.ten_sp}</h3><div className="fields">{[['MNV',selected.mnv],['SL đếm gốc',fmt(selected.sl_goc)],['SL trên sổ',fmt(selected.sl_so)],['Chênh lệch cũ',fmt(selected.chenh_cu)],['Tổng +/- QĐ',fmt(selected.delta)],['SL đếm mới',fmt(selected.sl_moi)],['Chênh lệch mới',fmt(selected.chenh_moi)],['GT chênh lệch mới',selected.gt_moi===null?'Chưa xác định':fmt(selected.gt_moi)],['Trạng thái Admin',adminStatus(selected)],['QR / Barcode',selected.qr_value],['Số bản ghi điều chỉnh',selected.so_lan]].map(([k,v])=><div key={k}><b>{k}</b><span>{v}</span></div>)}</div><h3>Chi tiết khu vực ({detailLines.length} dòng)</h3>
- {detailBusy?<p>Đang tải chi tiết...</p>:<div className="tablewrap"><table><thead><tr><th>Nguồn</th><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL hiện tại</th><th>Điều chỉnh</th></tr></thead><tbody>{detailLines.map(d=><tr key={d.identity}><td>{d.source}</td><td style={{overflowWrap:'anywhere'}}>{d.barcode||'—'}</td><td><input style={{minWidth:110,maxWidth:180}} value={detailKv(d)} onChange={e=>updateDetail(d,'kv',e.target.value)} /></td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.actual)}</td><td><div style={{display:'flex',alignItems:'center',gap:5}}><button className="small outline" onClick={()=>updateDetail(d,'sl',String(Math.max(0,detailActual(d)-1)))}>−</button><input aria-label={'SL '+d.kv} type="number" min="0" step="any" style={{width:90}} value={detailEdits[d.identity]?.sl??String(d.actual)} onChange={e=>updateDetail(d,'sl',e.target.value)}/><button className="small outline" onClick={()=>updateDetail(d,'sl',String(detailActual(d)+1))}>+</button></div></td></tr>)}</tbody></table>{!detailLines.length&&<p className="empty">Chưa có chi tiết khu vực.</p>}</div>}
- <div className="panel" style={{padding:12,marginTop:12}}><h3>Thêm khu vực mới</h3><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Khu vực<input placeholder="Ví dụ A3" value={detailNewKv.khu_vuc} onChange={e=>setDetailNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label><label>SL thực tế (quy đổi)<input type="number" min="0" step="any" value={detailNewKv.sl_thuc_te} onChange={e=>setDetailNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label></div></div>
- <button disabled={detailBusy||detailSaving} onClick={saveDetail}>{detailSaving?'Đang cập nhật...':'Cập nhật đã kiểm'}</button></div></div>}
+   {selected&&<div className="overlay" onClick={()=>setSelected(null)}>
+    <div className="panel modal inv-modal" onClick={e=>e.stopPropagation()} style={{width:'min(1100px,96vw)',maxWidth:'96vw',maxHeight:'92vh',overflowY:'auto',whiteSpace:'normal'}}>
+     <div className="modalhead"><h2>Chi tiết mã {selected.ma_sp}</h2><button className="outline" onClick={()=>setSelected(null)}>Đóng</button></div>
+     <h3 style={{whiteSpace:'normal',overflowWrap:'anywhere'}}>{selected.ten_sp||'Chưa có tên sản phẩm'}</h3>
+     <p>MNV: {selected.mnv||'—'} · Trạng thái Admin: {adminStatus(selected)}</p>
+     <h3>1. Chênh lệch cũ (theo DSCL)</h3>
+     <div className="inv-kpis inv-detail-kpis">
+      <div><small>SL đếm gốc</small><strong>{fmt(selected.sl_goc)}</strong></div>
+      <div><small>SL trên sổ</small><strong>{fmt(selected.sl_so)}</strong></div>
+      <div><small>Lượng chênh lệch</small><strong>{fmt(selected.chenh_cu)}</strong></div>
+      <div><small>GT chênh lệch cũ</small><strong>{selected.gt_cu===null?'—':fmt(selected.gt_cu)}</strong></div>
+      <div><small>ĐVT</small><strong>{selected.dvt||'—'}</strong></div>
+     </div>
+     <h3>2. Sau kiểm tra (cập nhật từ khu vực)</h3>
+     <div className="inv-kpis inv-detail-kpis">
+      <div><small>Tổng +/- SL</small><strong>{fmt(selected.delta)}</strong></div>
+      <div><small>SL đếm hiện tại</small><strong>{fmt(selected.sl_moi)}</strong></div>
+      <div><small>Chênh lệch hiện tại</small><strong>{fmt(selected.chenh_moi)}</strong></div>
+      <div><small>GT chênh lệch mới</small><strong>{selected.gt_moi===null?'Chưa xác định':fmt(selected.gt_moi)}</strong></div>
+     </div>
+     <h3>Chi tiết CT_KV ({detailLines.length} dòng)</h3>
+     {detailBusy?<p>Đang tải chi tiết...</p>:<div className="tablewrap"><table style={{whiteSpace:'normal',width:'100%'}}>
+      <thead><tr><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL đếm</th><th>SL thực tế</th><th>Trạng thái</th></tr></thead>
+      <tbody>{detailLines.map(d=><tr key={d.identity}>
+       <td className="barcode-cell" style={{overflowWrap:'anywhere',maxWidth:170}}>{d.barcode||'Chưa có Barcode'}</td>
+       <td><input aria-label={'Khu vực '+d.identity} style={{minWidth:100,width:'100%',maxWidth:170}} value={detailKv(d)} onChange={e=>updateDetail(d,'kv',e.target.value)}/></td>
+       <td>{d.dvt||'—'}</td><td style={{textAlign:'right'}}>{d.sl_nhap??'—'}</td>
+       <td style={{textAlign:'right'}}>{fmt(d.actual)}</td>
+       <td><div style={{display:'flex',alignItems:'center',gap:5,flexWrap:'wrap'}}>
+        <button type="button" className="small outline" aria-label={'Giảm SL '+d.identity} onClick={()=>updateDetail(d,'sl',String(Math.max(0,detailActual(d)-1)))}>−</button>
+        <input aria-label={'SL thực tế '+d.identity} type="number" min="0" step="any" style={{width:90,textAlign:'right'}} value={detailEdits[d.identity]?.sl??String(d.actual)} onChange={e=>updateDetail(d,'sl',e.target.value)}/>
+        <button type="button" className="small outline" aria-label={'Tăng SL '+d.identity} onClick={()=>updateDetail(d,'sl',String(detailActual(d)+1))}>+</button>
+       </div></td><td>{d.source}</td>
+      </tr>)}</tbody>
+     </table>{!detailLines.length&&<p className="empty">Chưa có dòng CT_KV tương ứng.</p>}</div>}
+     <div className="panel" style={{padding:16,margin:'14px 0'}}>
+      <h3>Thêm khu vực mới</h3>
+      <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+       <label>Khu vực mới<input placeholder="Ví dụ A3" value={detailNewKv.khu_vuc} onChange={e=>setDetailNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label>
+       <label>SL thực tế (quy đổi)<input type="number" min="0" step="any" value={detailNewKv.sl_thuc_te} onChange={e=>setDetailNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label>
+      </div><p className="inv-hint">Không cần nhập ĐVT. KV mới được lưu khi bấm Cập nhật đã kiểm.</p>
+     </div>
+     <button disabled={detailBusy||detailSaving} onClick={saveDetail}>{detailSaving?'Đang cập nhật...':'Cập nhật đã kiểm'}</button>
+    </div>
+   </div>}
  </div>;
 }
