@@ -43,9 +43,12 @@ export default function InventoryList({admin,profile,onMessage}){
   let corrections=[];
   if(ids.length){const c=await supabase.from('dieu_chinh').select('ma_sp,sl_chenh_lech,trang_thai_duyet').in('ma_sp',ids).limit(10000);if(c.error)throw c.error;corrections=c.data||[]}
   const totals=new Map();for(const c of corrections){if(['TU_CHOI','TỪ CHỐI','CHO_DUYET','CHỜ DUYỆT'].includes(txt(c.trang_thai_duyet).toUpperCase()))continue;const k=txt(c.ma_sp);totals.set(k,(totals.get(k)||0)+Number(c.sl_chenh_lech||0))}
-  const result=base.map(r=>({...r,_assignment:map.get(txt(r.ma_sp))||null,_currentCount:baseCount(r)+(totals.get(txt(r.ma_sp))||0),_barcodes:barcodesFor(r)})).filter(r=>!term||txt(r.ma_sp).toLowerCase().includes(term.toLowerCase())||txt(r.ten_sp).toLowerCase().includes(term.toLowerCase())||r._barcodes.toLowerCase().includes(term.toLowerCase()));
+  let finalCounts=new Map();
+  if(ids.length){const f=await supabase.from('final_lines').select('ma_sp,sl_dem').in('ma_sp',ids);if(!f.error)finalCounts=new Map((f.data||[]).map(x=>[txt(x.ma_sp),Number(x.sl_dem)]));}
+  const result=base.map(r=>({...r,_assignment:map.get(txt(r.ma_sp))||null,_currentCount:finalCounts.has(txt(r.ma_sp))?finalCounts.get(txt(r.ma_sp)):baseCount(r)+(totals.get(txt(r.ma_sp))||0),_barcodes:barcodesFor(r)})).filter(r=>!term||txt(r.ma_sp).toLowerCase().includes(term.toLowerCase())||txt(r.ten_sp).toLowerCase().includes(term.toLowerCase())||r._barcodes.toLowerCase().includes(term.toLowerCase()));
   if(alive){setItems(result);setTotal(count||0)}
  }catch(e){if(alive){setItems([]);setTotal(0);setError(e.message)}}finally{if(alive)setBusy(false)}}run();return()=>{alive=false}},[page,search,threshold,materialGroup,kv,sourceByProduct,refresh]);
+ useEffect(()=>{const refreshOnFocus=()=>{if(document.visibilityState==='visible')setRefresh(v=>v+1)};window.addEventListener('focus',refreshOnFocus);return()=>window.removeEventListener('focus',refreshOnFocus)},[]);
  const shown=useMemo(()=>items.filter(r=>state==='all'||status(r._assignment?.trang_thai)===state),[items,state]);
  async function openDetail(row){setSelected(row);setDetails([]);setEdits({});setNewKv({khu_vuc:'',sl_thuc_te:''});setDetailBusy(true);try{
   const [ct,bc,changes]=await Promise.all([supabase.from('ct_kv').select('*').eq('ma_sp',row.ma_sp).limit(500),supabase.from('bc').select('*').eq('ma_sp',row.ma_sp).limit(500),supabase.from('dieu_chinh').select('id,ct_kv_id,loai_dieu_chinh,khu_vuc_moi,sl_moi,sl_chenh_lech,trang_thai_duyet,ghi_chu').eq('ma_sp',row.ma_sp).limit(500)]);
@@ -69,15 +72,11 @@ export default function InventoryList({admin,profile,onMessage}){
   const kv=txt(newKv.khu_vuc),raw=txt(newKv.sl_thuc_te);
   if((kv||raw)&&(!kv||raw==='' ||!Number.isFinite(Number(raw))||Number(raw)<0))throw Error('Thêm KV: nhập Khu vực và SL thực tế hợp lệ.');
   if(changed.some(d=>!Number.isFinite(actual(d))||actual(d)<0))throw Error('SL thực tế phải là số không âm.');
-  // BC has no CT_KV id: save its actual count as a new counted area instead.
-  if(changed.some(d=>d._source==='BC'&&actual(d)<0))throw Error('SL thực tế BC không hợp lệ.');
+  if(changed.some(d=>d._source==='BC'))throw Error('Dòng BC chưa có CT_KV ID. Hãy dùng Thêm KV để lưu số lượng thực tế.');
   const who=profile?.mnv||selected._assignment?.mnv||null;
   for(const d of changed){
    if(d._source==='KV_MOI'){
     const {error}=await supabase.from('dieu_chinh').update({sl_moi:actual(d),sl_chenh_lech:actual(d)}).eq('id',d.id);if(error)throw error;
-   }else if(d._source==='BC'){
-    const payload={ma_sp:selected.ma_sp,ct_kv_id:null,loai_dieu_chinh:'THEM_KV',khu_vuc_cu:null,khu_vuc_moi:txt(d.khu_vuc)||'BC',sl_cu:0,sl_moi:actual(d),sl_chenh_lech:actual(d),mnv:who,nguoi_cap_nhat:who,ghi_chu:'Admin cập nhật từ dòng BC',trang_thai_duyet:'Không cần duyệt'};
-    const {error}=await supabase.from('dieu_chinh').insert(payload);if(error)throw error;
    }else{
     const payload={ma_sp:selected.ma_sp,ct_kv_id:d.id,loai_dieu_chinh:'SUA_SO_LUONG',khu_vuc_cu:d.khu_vuc||null,khu_vuc_moi:d.khu_vuc||null,sl_cu:Number(d._savedCount||0),sl_moi:actual(d),sl_chenh_lech:actual(d)-Number(d._savedCount||0),mnv:who,nguoi_cap_nhat:who,ghi_chu:'Cập nhật đã kiểm từ chi tiết mã hàng',trang_thai_duyet:'Không cần duyệt'};
     const {error}=await supabase.from('dieu_chinh').insert(payload);if(error)throw error;
@@ -90,8 +89,7 @@ export default function InventoryList({admin,profile,onMessage}){
   }
   const {data:assignment,error:findError}=await supabase.from('phan_cong').select('ma_sp').eq('ma_sp',selected.ma_sp).maybeSingle();if(findError)throw findError;
   if(assignment){const {error}=await supabase.from('phan_cong').update({trang_thai:'Đã kiểm'}).eq('ma_sp',selected.ma_sp);if(error)throw error;}
-  if(changed.length||(kv&&raw!=='')){const {data:final,error:finalError}=await supabase.from('final_lines').select('ma_sp,du_lieu_goc').eq('ma_sp',selected.ma_sp).maybeSingle();if(finalError)throw Error('Đã lưu điều chỉnh nhưng chưa kiểm tra được Final: '+finalError.message);if(!final)throw Error('Đã lưu điều chỉnh nhưng Final chưa có mã này. Kiểm tra trigger v10_final_on_correction và chênh lệch ròng.');}
-  onMessage('Đã lưu thay đổi và kiểm tra đồng bộ Final thành công.');setSelected(null);setRefresh(x=>x+1);
+  onMessage('Đã lưu số lượng, KV mới và trạng thái Đã kiểm.');setSelected(null);setRefresh(x=>x+1);
  }catch(e){onMessage('Không cập nhật được: '+e.message)}finally{setSaving(false)}}
  return <div className="inventory-page">
   <div className="inv-title"><div><h2>Danh sách mã hàng (đi kiểm)</h2><p>DSCL + CT_KV + BC · Lọc theo ngưỡng, Nhóm vật tư và trạng thái</p></div><button className="outline" onClick={()=>setRefresh(x=>x+1)}>↻ Tải lại</button></div>

@@ -85,28 +85,44 @@ export default function FinalView(){
   return out;
  }
  async function loadFinal(){
-  // Read the synchronized Final table directly; other tables must not block it.
+  // The synchronized table is authoritative. Do not depend on assignment,
+  // barcode, or adjustment history just to display a Final product.
   const source=await fetchAll('final_lines',[],500);
-  const result=source.filter(x=>x.du_lieu_goc?.delta==null||Math.abs(number(x.du_lieu_goc.delta))>1e-9).map(x=>{
+  const result=source.filter(x=>{
+   const delta=x.du_lieu_goc?.delta;
+   return delta===undefined||delta===null?Math.abs(number(x.chenh_lech))>1e-9:Math.abs(number(delta))>1e-9;
+  }).map(x=>{
    const oldCount=number(x.du_lieu_goc?.sl_dem_goc??x.sl_dem);
    const newCount=number(x.sl_dem),book=number(x.sl_so);
-   const delta=number(x.du_lieu_goc?.delta??newCount-oldCount);
    const oldDiff=oldCount-book,newDiff=newCount-book;
    const newValue=x.gt_chenh_lech==null?null:number(x.gt_chenh_lech);
-   const oldValue=newValue!==null&&newDiff!==0?newValue*oldDiff/newDiff:null;
-   return {ma_sp:key(x.ma_sp),ten_sp:x.ten_sp||'',mnv:key(x.mnv),sl_goc:oldCount,sl_so:book,chenh_cu:oldDiff,gt_cu:oldValue,delta,sl_moi:newCount,chenh_moi:newDiff,gt_moi:newValue,trang_thai:x.trang_thai||'Chưa kiểm',dvt:x.dvt_co_ban||'',so_lan:1,change_revision:key(x.updated_at||x.created_at||''),qr_value:key(x.qr_content||x.barcode||x.ma_sp)};
+   return {ma_sp:key(x.ma_sp),ten_sp:x.ten_sp||'',mnv:key(x.mnv),
+    sl_goc:oldCount,sl_so:book,chenh_cu:oldDiff,
+    gt_cu:newValue!==null&&newDiff!==0?newValue*oldDiff/newDiff:null,
+    delta:number(x.du_lieu_goc?.delta??newCount-oldCount),sl_moi:newCount,
+    chenh_moi:newDiff,gt_moi:newValue,trang_thai:x.trang_thai||'Chưa kiểm',
+    dvt:x.dvt_co_ban||'',so_lan:1,
+    change_revision:key(x.updated_at||x.created_at||''),
+    qr_value:key(x.qr_content||x.barcode||x.ma_sp)};
   });
   let checks=[];
-  if(result.length){try{const {data,error}=await supabase.from('admin_final_check').select('*').in('ma_sp',result.map(r=>r.ma_sp));if(!error)checks=data||[];}catch(_){}}
+  if(result.length){try{
+   const {data,error}=await supabase.from('admin_final_check').select('*').in('ma_sp',result.map(r=>r.ma_sp));
+   if(!error)checks=data||[];
+  }catch(_){}}
   return {rows:result,details:new Map(),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
  }
  async function reload(){
   setBusy(true);setError('');
-  try{const result=await loadFinal();setDetailData(result.details);setApprovals(result.checks);setRows(result.rows);setPage(0);}
-  catch(e){setError('Không tải được Final: '+(e?.message||String(e)));}
+  try{const result=await loadFinal();setDetailData(result.details);setApprovals(result.checks);setRows(result.rows);setPage(0)}
+  catch(e){setError('Không tải được Final: '+(e?.message||String(e)))}
   finally{setBusy(false)}
  }
- useEffect(()=>{reload()},[]);
+ useEffect(()=>{reload();const refresh=()=>{if(document.visibilityState==='visible')reload()};
+  window.addEventListener('focus',refresh);document.addEventListener('visibilitychange',refresh);
+  const channel=supabase.channel('v10-final-live').on('postgres_changes',{event:'*',schema:'public',table:'final_lines'},refresh).subscribe();
+  return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);supabase.removeChannel(channel)};
+ },[]);
  const adminStatus=r=>approvals.get(r.ma_sp)?.revision===signature(r)?'Đã kiểm':'Chưa kiểm';
  async function confirmAdmin(r){
   setBusy(true);setError('');try{

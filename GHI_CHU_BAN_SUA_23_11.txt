@@ -1,0 +1,1 @@
+V10: Admin sửa tại Danh sách mã hàng; Final đọc trực tiếp final_lines; đồng bộ hiển thị trên các màn hình; tối ưu giao diện điện thoại nhân viên. Chưa thêm ô SL kiểm lại hay nút Lưu cập nhật tại Final. Cần Supabase trigger hiện có đồng bộ dieu_chinh -> final_lines. Cấu hình .env.local riêng, không kèm trong ZIP.

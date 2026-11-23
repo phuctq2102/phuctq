@@ -17,6 +17,7 @@ export default function EmployeeCheck({profile,onMessage}){
   const list=data||[];setAssign(list);const map=new Map();for(let i=0;i<list.length;i+=150){const ids=list.slice(i,i+150).map(r=>r.ma_sp);if(!ids.length)continue;const {data:ds,error:de}=await supabase.from('dscl').select('ma_sp,ten_sp,sl_dem,sl_so,gt_chenh_lech,dvt_co_ban').in('ma_sp',ids);if(de)throw de;(ds||[]).forEach(r=>map.set(str(r.ma_sp),r))}setProducts(map);
  }catch(e){setError('Không tải được phân công: '+e.message)}finally{setLoading(false)}}
  useEffect(()=>{reload()},[profile?.mnv]);
+ useEffect(()=>{const onFocus=()=>{if(document.visibilityState==='visible'&&!selected)reload()};window.addEventListener('focus',onFocus);return()=>window.removeEventListener('focus',onFocus)},[profile?.mnv,selected]);
  function stopCamera(){if(scanTimer.current){clearInterval(scanTimer.current);scanTimer.current=null;}if(streamRef.current){streamRef.current.getTracks().forEach(t=>t.stop());streamRef.current=null;}setScanOpen(false)}
  useEffect(()=>()=>{if(scanTimer.current)clearInterval(scanTimer.current);if(streamRef.current)streamRef.current.getTracks().forEach(t=>t.stop())},[]);
  async function startCamera(){
