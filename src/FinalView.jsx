@@ -143,7 +143,12 @@ export default function FinalView(){
    const allBarcodes=[...new Set([...ctRows,...bcRows].flatMap(x=>barcodeParts(x.barcode)))].join(';');
    const lines=source.map((x,i)=>({identity:(useBC?'bc:':'ct:')+(x.id??i),id:x.id,source:useBC?'BC':'CT_KV',barcode:x.barcode||allBarcodes,kv:x.khu_vuc||'',dvt:x.dvt_nhap||x.dvt_co_ban||'',sl_nhap:x.sl_nhap??null,base:number(x.sl_dem),actual:useBC?number(x.sl_dem):number(latest.get(key(x.id))?.sl_moi??x.sl_dem),saved:useBC?number(x.sl_dem):number(latest.get(key(x.id))?.sl_moi??x.sl_dem)}));
    for(const c of changes.filter(isNew))lines.push({identity:'new:'+c.id,id:c.id,source:'KV_MOI',barcode:barcodeParts(c.ghi_chu?.match(/BARCODE:([^;]*)/)?.[1]||'').join(';')||allBarcodes,kv:c.khu_vuc_moi||'',dvt:'',sl_nhap:null,base:0,actual:number(c.sl_moi),saved:number(c.sl_moi)});
-   const totalChange=changes.reduce((n,c)=>n+number(c.sl_chenh_lech),0);
+   const effective=new Map();
+   for(const c of changes.filter(c=>!isNew(c)&&c.ct_kv_id!=null))effective.set(key(c.ct_kv_id),c);
+   const ctBase=new Map(ctRows.map(x=>[key(x.id),number(x.sl_dem)]));
+   const originalCorrections=[...effective.entries()].reduce((n,[id,c])=>n+number(c.sl_moi)-(ctBase.has(id)?ctBase.get(id):number(c.sl_cu)),0);
+   const addedCorrections=changes.filter(isNew).reduce((n,c)=>n+number(c.sl_moi),0);
+   const totalChange=originalCorrections+addedCorrections;
    setDetailProduct({...product,delta:totalChange,original:number(product.sl_dem),book:number(product.sl_so)});
    setDetailData(old=>new Map(old).set(r.ma_sp,lines));
   }catch(e){setDetailError('Không tải được chi tiết: '+(e?.message||String(e)))}
@@ -161,7 +166,7 @@ export default function FinalView(){
    const changed=detailLines.filter(d=>edits[d.identity]!==undefined&&actualLine(d)!==number(d.saved));
    const kv=key(newKv.khu_vuc),raw=key(newKv.sl_thuc_te);
    if((kv||raw)&&(!kv||raw===''||!Number.isFinite(Number(raw))||Number(raw)<0))throw Error('Thêm KV: cần khu vực và SL thực tế không âm.');
-   if(changed.some(d=>!Number.isFinite(actualLine(d))||actualLine(d)<0))throw Error('SL thực tế phải là số không âm.');
+   if(changed.some(d=>key(edits[d.identity])===''||!Number.isFinite(actualLine(d))||actualLine(d)<0))throw Error('SL thực tế phải là số không âm.');
    if(changed.some(d=>d.source==='BC'))throw Error('Dòng BC không có CT_KV ID. Hãy dùng Thêm KV để lưu SL thực tế.');
    const who=selected.mnv||null;
    for(const d of changed){
@@ -253,7 +258,7 @@ export default function FinalView(){
  const filtered=useMemo(()=>rows.filter(r=>(status==='all'||adminStatus(r)===status)&&(!search||[r.ma_sp,r.ten_sp,r.mnv].some(v=>key(v).toLowerCase().includes(search.toLowerCase())))),[rows,status,search]);
  const done=rows.filter(r=>adminStatus(r)==='Đã kiểm').length,modified=rows.length;
  return <div className="final-page">
-  <div className="inv-title"><div><h2>FINAL / QR Code · DETAIL-DSCL-231123</h2><p>Tự động tổng hợp kết quả mới nhất · Mỗi mã sản phẩm một dòng</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="outline" onClick={reload} disabled={busy||exportBusy}>↻ Tải Final mới nhất</button><button onClick={exportFinal} disabled={busy||exportBusy||!filtered.length}>{exportBusy?"Đang tạo Excel + QR...":"⬇ Xuất Excel + QR"}</button></div></div>
+  <div className="inv-title"><div><h2>FINAL / QR Code · FINAL-AUTO-SL-231123</h2><p>Tự động tổng hợp kết quả mới nhất · Mỗi mã sản phẩm một dòng</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="outline" onClick={reload} disabled={busy||exportBusy}>↻ Tải Final mới nhất</button><button onClick={exportFinal} disabled={busy||exportBusy||!filtered.length}>{exportBusy?"Đang tạo Excel + QR...":"⬇ Xuất Excel + QR"}</button></div></div>
   <div className="inv-kpis"><div><small>Tổng mã</small><strong>{rows.length}</strong></div><div><small>Có điều chỉnh</small><strong>{modified}</strong></div><div><small>Đã kiểm</small><strong className="green">{done}</strong></div><div><small>Chưa kiểm</small><strong className="orange">{rows.length-done}</strong></div></div>
   <div className="panel"><div className="employee-filter"><input placeholder="Tìm mã SP, tên sản phẩm, MNV..." value={search} onChange={e=>{setSearch(e.target.value);setPage(0)}}/><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">Tất cả trạng thái</option><option value="Đã kiểm">Đã kiểm</option><option value="Chưa kiểm">Chưa kiểm</option></select><span>{filtered.length} mã</span></div>
   {error&&<div className="warning">{error}</div>}{busy&&<p>Đang tổng hợp Final...</p>}
@@ -279,12 +284,12 @@ export default function FinalView(){
     </div>
     {detailBusy&&<p>Đang tải chi tiết...</p>}{detailError&&<div className="warning">{detailError}</div>}
     <h3>Chi tiết CT_KV ({detailLines.length} dòng)</h3>
-    <div className="tablewrap" style={{maxWidth:'100%',overflowX:'auto'}}><table style={{whiteSpace:'normal',fontSize:12}}><thead><tr><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL đếm</th><th>SL thực tế</th><th>Trạng thái</th></tr></thead><tbody>
-     {detailLines.map(d=><tr key={d.identity}><td className="barcode-cell" style={{overflowWrap:'anywhere'}}>{d.barcode||'Chưa có Barcode'}</td><td>{d.kv||'—'}</td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.saved)}</td><td><div style={{display:'flex',alignItems:'center',gap:4}}><button className="outline small" disabled={savingDetail||d.source==='BC'} onClick={()=>setEdits(v=>({...v,[d.identity]:Math.max(0,actualLine(d)-1)}))}>−</button><input type="number" min="0" style={{width:86}} disabled={savingDetail||d.source==='BC'} value={edits[d.identity]??d.saved} onChange={e=>setEdits(v=>({...v,[d.identity]:e.target.value}))}/><button className="outline small" disabled={savingDetail||d.source==='BC'} onClick={()=>setEdits(v=>({...v,[d.identity]:actualLine(d)+1}))}>+</button></div></td><td>{d.source}</td></tr>)}
+    <div className="tablewrap" style={{maxWidth:'100%',overflowX:'auto'}}><table style={{whiteSpace:'normal',fontSize:12}}><thead><tr><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL đếm</th><th>SL thực tế</th><th>+/- tự tính</th><th>Trạng thái</th></tr></thead><tbody>
+     {detailLines.map(d=><tr key={d.identity}><td className="barcode-cell" style={{overflowWrap:'anywhere'}}>{d.barcode||'Chưa có Barcode'}</td><td>{d.kv||'—'}</td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.saved)}</td><td><input aria-label={'SL thực tế '+(d.kv||d.identity)} type="number" min="0" step="any" style={{width:110,maxWidth:'100%',boxSizing:'border-box',textAlign:'right'}} disabled={savingDetail||d.source==='BC'} value={edits[d.identity]??d.saved} onChange={e=>setEdits(v=>({...v,[d.identity]:e.target.value}))}/></td><td style={{textAlign:"right",fontWeight:700}} className={actualLine(d)-number(d.base)<0?"negative":"positive"}>{fmt(actualLine(d)-number(d.base))}</td><td>{d.source}</td></tr>)}
     </tbody></table>{!detailBusy&&!detailError&&!detailLines.length&&<p className="empty">Chưa có dòng CT_KV tương ứng.</p>}</div>
     <div className="panel" style={{padding:16,margin:'14px 0'}}><h3>Thêm khu vực mới</h3><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Khu vực mới<input placeholder="Ví dụ A3" value={newKv.khu_vuc} onChange={e=>setNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label><label>SL thực tế (quy đổi)<input type="number" min="0" value={newKv.sl_thuc_te} onChange={e=>setNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label></div></div>
     <button disabled={savingDetail||detailBusy||!!detailError||!detailProduct} onClick={saveDetail}>{savingDetail?'Đang cập nhật...':'Cập nhật đã kiểm'}</button>
-    <p className="inv-hint">Cách tính SL giống Danh sách mã hàng: SL DSCL + tổng điều chỉnh + thay đổi đang nhập. Final được đồng bộ sau khi lưu bằng RPC hiện có.</p>
+    <p className="inv-hint">Cách tính SL giống Danh sách mã hàng: SL DSCL + điều chỉnh hiệu lực theo từng khu vực + khu vực mới. Cột +/- tự tính khi nhập SL thực tế. Final được đồng bộ sau khi lưu bằng RPC hiện có.</p>
    </div></div>}
  </div>;
 }
