@@ -31,7 +31,7 @@ export function summarizeFinal(assignments,products,corrections,ctRows){
  for(const code of byProduct.keys()){
   const a=assignmentByCode.get(code)||{};
   const p=products.get(code);
-  if(!p)continue; // Cannot calculate against DSCL without original count.
+  if(!p)continue; // Missing DSCL: not safe to invent original count.
   const changes=(byProduct.get(code)||[]).slice().sort((a,b)=>stamp(a).localeCompare(stamp(b))||number(a.id)-number(b.id));
   const latest=new Map(),additions=new Map(),first=new Map();
   for(const c of changes){
@@ -95,6 +95,7 @@ export default function FinalView(){
  }
  async function loadFinal(){
   const dc=await fetchAll('dieu_chinh',[],1000);
+  // Always use current correction records; do not require final_lines or assignment rows.
   const codes=[...new Set(dc.filter(valid).map(c=>key(c.ma_sp)).filter(Boolean))];
   if(!codes.length)return {rows:[],details:new Map(),checks:new Map()};
   const [assignments,ds,ct,bc]=await Promise.all([
@@ -106,8 +107,13 @@ export default function FinalView(){
   const products=new Map(ds.map(p=>[key(p.ma_sp),p]));
   if(!products.size && codes.length)throw new Error('Có điều chỉnh nhưng không đọc được DSCL cho các mã: '+codes.slice(0,5).join(', '));
   const result=summarizeFinal(assignments,products,dc,ct).map(r=>({...r,qr_value:pickQrBarcode(r.ma_sp,r.dvt,ct,bc)}));
-  const {data:checks,error:checkError}=await supabase.from('admin_final_check').select('*').in('ma_sp',codes.slice(0,80));
-  return {rows:result,details:buildDetails(ct,dc),checks:new Map((checkError?[]:(checks||[])).map(x=>[key(x.ma_sp),x]))};
+  let checks=[];
+  // Approval metadata is optional: never hide Final if this query fails.
+  for(let i=0;i<codes.length;i+=80){
+   const {data,error}=await supabase.from('admin_final_check').select('*').in('ma_sp',codes.slice(i,i+80));
+   if(error)break;checks.push(...(data||[]));
+  }
+  return {rows:result,details:buildDetails(ct,dc),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
  }
  async function reload(){
   setBusy(true);setError('');

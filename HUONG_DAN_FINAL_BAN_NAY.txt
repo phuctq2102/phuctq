@@ -1,0 +1,9 @@
+BAN SUA FINAL - 23/11/2026
+- Final doc truc tiep dieu_chinh, dscl, ct_kv.
+- Khong phu thuoc phan_cong/final_lines de hien thi.
+- Loi admin_final_check khong lam mat danh sach Final.
+- Trung SUA_SO_LUONG cung ct_kv_id chi lay ban ghi moi nhat.
+- THEM_KV tinh mot lan theo id.
+- Barcode o Danh sach ma hang giu an nhu ban nguon.
+
+QUAN TRONG: Ban nay sua hien thi Final; CHUA tao trigger ghi vao bang final_lines. Khong nen xem la da dong bo CSDL.
