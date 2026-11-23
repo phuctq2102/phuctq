@@ -71,6 +71,7 @@ export function buildDetails(ctRows,corrections){
 
 export default function FinalView(){
  const [exportBusy,setExportBusy]=useState(false);
+ const [detailProduct,setDetailProduct]=useState(null),[edits,setEdits]=useState({}),[newKv,setNewKv]=useState({khu_vuc:'',sl_thuc_te:''}),[savingDetail,setSavingDetail]=useState(false);
  const [detailData,setDetailData]=useState(new Map()),[detailBusy,setDetailBusy]=useState(false),[detailError,setDetailError]=useState(''),[rows,setRows]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState(''),[status,setStatus]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState(null),[approvals,setApprovals]=useState(new Map());
  // Query only products with corrections. Fetching the entire DSCL/CT_KV/BC
  // was forcing Final to wait for thousands of unrelated rows.
@@ -124,29 +125,62 @@ export default function FinalView(){
   return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);supabase.removeChannel(channel)};
  },[]);
  async function openDetail(r){
-  setSelected(r);setDetailBusy(true);setDetailError('');
+  setSelected(r);setDetailBusy(true);setDetailError('');setEdits({});setNewKv({khu_vuc:'',sl_thuc_te:''});setDetailProduct(null);
   setDetailData(old=>{const next=new Map(old);next.delete(r.ma_sp);return next});
   try{
-   const [ct,bc,dc]=await Promise.all([
-    supabase.from('ct_kv').select('id,ma_sp,barcode,khu_vuc,dvt_nhap,sl_nhap,sl_dem').eq('ma_sp',r.ma_sp).limit(1000),
-    supabase.from('bc').select('ma_sp,barcode,dvt_co_ban').eq('ma_sp',r.ma_sp).limit(1000),
-    supabase.from('dieu_chinh').select('id,ma_sp,ct_kv_id,loai_dieu_chinh,khu_vuc_moi,sl_cu,sl_moi,sl_chenh_lech,trang_thai_duyet,created_at').eq('ma_sp',r.ma_sp).order('created_at',{ascending:true}).limit(1000)
+   const [ct,bc,dc,ds]=await Promise.all([
+    supabase.from('ct_kv').select('*').eq('ma_sp',r.ma_sp).limit(1000),
+    supabase.from('bc').select('*').eq('ma_sp',r.ma_sp).limit(1000),
+    supabase.from('dieu_chinh').select('id,ma_sp,ct_kv_id,loai_dieu_chinh,khu_vuc_moi,sl_cu,sl_moi,sl_chenh_lech,trang_thai_duyet,ghi_chu,created_at').eq('ma_sp',r.ma_sp).order('created_at',{ascending:true}).limit(1000),
+    supabase.from('dscl').select('ma_sp,sl_dem,sl_so,gt_chenh_lech,dvt_co_ban').eq('ma_sp',r.ma_sp).limit(1)
    ]);
-   if(ct.error)throw ct.error;
-   if(bc.error)throw bc.error;
-   if(dc.error)throw dc.error;
-   const ctRows=ct.data||[],bcRows=bc.data||[],changes=(dc.data||[]).filter(valid);
-   const last=new Map();for(const c of changes){if(!isNew(c)&&c.ct_kv_id!=null)last.set(key(c.ct_kv_id),c)}
-   const barcodeFallback=[...new Set(bcRows.filter(x=>norm(x.dvt_co_ban)===norm(r.dvt)).flatMap(x=>barcodeParts(x.barcode)))].join('; ');
-   const lines=ctRows.map(x=>{const c=last.get(key(x.id)),base=number(x.sl_dem),actual=c?number(c.sl_moi):base;
-    return {identity:'ct:'+x.id,source:'CT_KV',barcode:x.barcode||barcodeFallback,kv:c?.khu_vuc_moi||x.khu_vuc,dvt:x.dvt_nhap,sl_nhap:x.sl_nhap,base,actual,delta:actual-base};
-   });
-   const added=new Map();for(const c of changes.filter(isNew))added.set(key(c.ma_dong_moi)||('kv:'+norm(c.khu_vuc_moi)),c);
-   for(const [id,c] of added){const actual=number(c.sl_moi);lines.push({identity:'new:'+id,source:'KV mới',barcode:barcodeFallback,kv:c.khu_vuc_moi,dvt:r.dvt,sl_nhap:null,base:0,actual,delta:actual})}
-   if(!lines.length&&bcRows.length){lines.push(...bcRows.map((x,i)=>({identity:'bc:'+i,source:'BC',barcode:x.barcode,kv:'—',dvt:x.dvt_co_ban,sl_nhap:null,base:0,actual:0,delta:0})))}
+   for(const [name,res] of [['CT_KV',ct],['BC',bc],['DIEU_CHINH',dc],['DSCL',ds]])if(res.error)throw new Error(name+': '+res.error.message);
+   const product=ds.data?.[0]||{sl_dem:r.sl_goc,sl_so:r.sl_so,gt_chenh_lech:r.gt_cu,dvt_co_ban:r.dvt};
+   const changes=(dc.data||[]).filter(valid),ctRows=ct.data||[],bcRows=bc.data||[];
+   const latest=new Map();for(const c of changes)if(!isNew(c)&&c.ct_kv_id!=null)latest.set(key(c.ct_kv_id),c);
+   const useBC=(number(product.sl_dem)===0&&bcRows.length>0)||(!ctRows.length&&bcRows.length>0);
+   const source=useBC?bcRows:ctRows;
+   const allBarcodes=[...new Set([...ctRows,...bcRows].flatMap(x=>barcodeParts(x.barcode)))].join(';');
+   const lines=source.map((x,i)=>({identity:(useBC?'bc:':'ct:')+(x.id??i),id:x.id,source:useBC?'BC':'CT_KV',barcode:x.barcode||allBarcodes,kv:x.khu_vuc||'',dvt:x.dvt_nhap||x.dvt_co_ban||'',sl_nhap:x.sl_nhap??null,base:number(x.sl_dem),actual:useBC?number(x.sl_dem):number(latest.get(key(x.id))?.sl_moi??x.sl_dem),saved:useBC?number(x.sl_dem):number(latest.get(key(x.id))?.sl_moi??x.sl_dem)}));
+   for(const c of changes.filter(isNew))lines.push({identity:'new:'+c.id,id:c.id,source:'KV_MOI',barcode:barcodeParts(c.ghi_chu?.match(/BARCODE:([^;]*)/)?.[1]||'').join(';')||allBarcodes,kv:c.khu_vuc_moi||'',dvt:'',sl_nhap:null,base:0,actual:number(c.sl_moi),saved:number(c.sl_moi)});
+   const totalChange=changes.reduce((n,c)=>n+number(c.sl_chenh_lech),0);
+   setDetailProduct({...product,delta:totalChange,original:number(product.sl_dem),book:number(product.sl_so)});
    setDetailData(old=>new Map(old).set(r.ma_sp,lines));
   }catch(e){setDetailError('Không tải được chi tiết: '+(e?.message||String(e)))}
   finally{setDetailBusy(false)}
+ }
+ const detailLines=selected?(detailData.get(selected.ma_sp)||[]):[];
+ const actualLine=d=>Number(edits[d.identity]??d.saved??0);
+ const pendingDelta=detailLines.reduce((n,d)=>n+(actualLine(d)-number(d.saved)),0)+(key(newKv.khu_vuc)&&key(newKv.sl_thuc_te)!==''?number(newKv.sl_thuc_te):0);
+ const originalCount=detailProduct?detailProduct.original:0;
+ const currentCount=originalCount+number(detailProduct?.delta)+pendingDelta;
+ async function saveDetail(){
+  if(!selected||savingDetail||detailBusy||!detailProduct)return;
+  setSavingDetail(true);setDetailError('');
+  try{
+   const changed=detailLines.filter(d=>edits[d.identity]!==undefined&&actualLine(d)!==number(d.saved));
+   const kv=key(newKv.khu_vuc),raw=key(newKv.sl_thuc_te);
+   if((kv||raw)&&(!kv||raw===''||!Number.isFinite(Number(raw))||Number(raw)<0))throw Error('Thêm KV: cần khu vực và SL thực tế không âm.');
+   if(changed.some(d=>!Number.isFinite(actualLine(d))||actualLine(d)<0))throw Error('SL thực tế phải là số không âm.');
+   if(changed.some(d=>d.source==='BC'))throw Error('Dòng BC không có CT_KV ID. Hãy dùng Thêm KV để lưu SL thực tế.');
+   const who=selected.mnv||null;
+   for(const d of changed){
+    if(d.source==='KV_MOI'){
+     const {error}=await supabase.from('dieu_chinh').update({sl_moi:actualLine(d),sl_chenh_lech:actualLine(d)}).eq('id',d.id);if(error)throw error;
+    }else{
+     const payload={ma_sp:selected.ma_sp,ct_kv_id:d.id,loai_dieu_chinh:'SUA_SO_LUONG',khu_vuc_cu:d.kv||null,khu_vuc_moi:d.kv||null,sl_cu:number(d.saved),sl_moi:actualLine(d),sl_chenh_lech:actualLine(d)-number(d.saved),mnv:who,nguoi_cap_nhat:who,ghi_chu:'Cập nhật từ Final',trang_thai_duyet:'Không cần duyệt'};
+     const {error}=await supabase.from('dieu_chinh').insert(payload);if(error)throw error;
+    }
+   }
+   if(kv&&raw!==''){
+    const n=Number(raw);const {error}=await supabase.from('dieu_chinh').insert({ma_sp:selected.ma_sp,ct_kv_id:null,loai_dieu_chinh:'THEM_KV',khu_vuc_cu:null,khu_vuc_moi:kv,sl_cu:0,sl_moi:n,sl_chenh_lech:n,mnv:who,nguoi_cap_nhat:who,ghi_chu:'KV mới từ Final',trang_thai_duyet:'Không cần duyệt'});if(error)throw error;
+   }
+   const {error:statusError}=await supabase.from('phan_cong').update({trang_thai:'Đã kiểm'}).eq('ma_sp',selected.ma_sp);if(statusError)throw statusError;
+   // The database must have its existing Final sync trigger/RPC enabled.
+   const {error:syncError}=await supabase.rpc('v10_admin_refresh_final',{p_ma_sp:selected.ma_sp});
+   if(syncError)throw new Error('Đã ghi điều chỉnh nhưng chưa đồng bộ Final: '+syncError.message);
+   setSelected(null);await reload();
+  }catch(e){setDetailError('Không cập nhật được: '+(e?.message||String(e)))}finally{setSavingDetail(false)}
  }
  const adminStatus=r=>approvals.get(r.ma_sp)?.revision===signature(r)?'Đã kiểm':'Chưa kiểm';
  async function confirmAdmin(r){
@@ -219,13 +253,38 @@ export default function FinalView(){
  const filtered=useMemo(()=>rows.filter(r=>(status==='all'||adminStatus(r)===status)&&(!search||[r.ma_sp,r.ten_sp,r.mnv].some(v=>key(v).toLowerCase().includes(search.toLowerCase())))),[rows,status,search]);
  const done=rows.filter(r=>adminStatus(r)==='Đã kiểm').length,modified=rows.length;
  return <div className="final-page">
-  <div className="inv-title"><div><h2>FINAL / QR Code · DETAIL-FIX-231123</h2><p>Tự động tổng hợp kết quả mới nhất · Mỗi mã sản phẩm một dòng</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="outline" onClick={reload} disabled={busy||exportBusy}>↻ Tải Final mới nhất</button><button onClick={exportFinal} disabled={busy||exportBusy||!filtered.length}>{exportBusy?"Đang tạo Excel + QR...":"⬇ Xuất Excel + QR"}</button></div></div>
+  <div className="inv-title"><div><h2>FINAL / QR Code · DETAIL-DSCL-231123</h2><p>Tự động tổng hợp kết quả mới nhất · Mỗi mã sản phẩm một dòng</p></div><div style={{display:"flex",gap:8,flexWrap:"wrap"}}><button className="outline" onClick={reload} disabled={busy||exportBusy}>↻ Tải Final mới nhất</button><button onClick={exportFinal} disabled={busy||exportBusy||!filtered.length}>{exportBusy?"Đang tạo Excel + QR...":"⬇ Xuất Excel + QR"}</button></div></div>
   <div className="inv-kpis"><div><small>Tổng mã</small><strong>{rows.length}</strong></div><div><small>Có điều chỉnh</small><strong>{modified}</strong></div><div><small>Đã kiểm</small><strong className="green">{done}</strong></div><div><small>Chưa kiểm</small><strong className="orange">{rows.length-done}</strong></div></div>
   <div className="panel"><div className="employee-filter"><input placeholder="Tìm mã SP, tên sản phẩm, MNV..." value={search} onChange={e=>{setSearch(e.target.value);setPage(0)}}/><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">Tất cả trạng thái</option><option value="Đã kiểm">Đã kiểm</option><option value="Chưa kiểm">Chưa kiểm</option></select><span>{filtered.length} mã</span></div>
   {error&&<div className="warning">{error}</div>}{busy&&<p>Đang tổng hợp Final...</p>}
   <div className="tablewrap final-table" style={{maxWidth:"100%",overflowX:"auto"}}><table style={{whiteSpace:"normal",fontSize:12}}><thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th>MNV</th><th>SL đếm gốc</th><th>SL trên sổ</th><th>Chênh lệch cũ</th><th>GT lệch cũ</th><th>+/- QĐ</th><th>SL đếm mới</th><th>Chênh lệch mới</th><th>GT lệch mới*</th><th>Trạng thái Admin</th><th>QR</th><th>Xác nhận Admin</th><th>Chi tiết</th></tr></thead><tbody>{filtered.slice(page*100,(page+1)*100).map(r=><tr key={r.ma_sp}><td><b>{r.ma_sp}</b></td><td className="inv-name" style={{minWidth:145,maxWidth:220,whiteSpace:"normal",overflowWrap:"anywhere"}}>{r.ten_sp}</td><td>{r.mnv}</td><td>{fmt(r.sl_goc)}</td><td>{fmt(r.sl_so)}</td><td>{fmt(r.chenh_cu)}</td><td>{fmt(r.gt_cu)}</td><td className={r.delta<0?'negative':r.delta>0?'positive':''}>{fmt(r.delta)}</td><td style={{textAlign:"right",fontWeight:600}}>{fmt(r.sl_moi)}</td><td className={r.chenh_moi<0?'negative':'positive'}>{fmt(r.chenh_moi)}</td><td>{r.gt_moi===null?'—':fmt(r.gt_moi)}</td><td><span className={'inv-status '+(adminStatus(r)==='Đã kiểm'?'done':'pending')}>{adminStatus(r)}</span></td><td><img src={qrUrl(r)} alt={'QR '+r.qr_value} width="72" height="72" loading="lazy"/><div style={{fontSize:10,overflowWrap:'anywhere',maxWidth:130}}>{r.qr_value}</div></td><td><button className="small" disabled={busy||adminStatus(r)==='Đã kiểm'} onClick={()=>confirmAdmin(r)}>Xác nhận đã kiểm</button></td><td><button className="small" onClick={()=>openDetail(r)}>Xem</button></td></tr>)}</tbody></table>{!busy&&!filtered.length&&<p className="empty">Không có mã phù hợp</p>}</div>
   <div className="pager"><button className="outline" disabled={page===0} onClick={()=>setPage(v=>v-1)}>Trước</button><span>Trang {page+1}/{Math.max(1,Math.ceil(filtered.length/100))}</span><button className="outline" disabled={(page+1)*100>=filtered.length} onClick={()=>setPage(v=>v+1)}>Sau</button></div>
   <p className="inv-hint">* GT lệch mới là ước tính theo đơn giá suy ra từ DSCL; nếu chênh lệch cũ bằng 0 thì để trống. Final chỉ hiển thị mã có thay đổi SL ròng khác 0; trạng thái xác nhận riêng của Admin. QR sử dụng dịch vụ ảnh bên ngoài, cần kết nối Internet. Nút xuất Excel + QR tải toàn bộ các mã theo bộ lọc hiện tại, không chỉ trang đang xem. File QR nhúng cần ExcelJS từ CDN và ảnh QR tải được qua Internet.</p></div>
-  {selected&&<div className="overlay" onClick={()=>setSelected(null)}><div className="panel modal" style={{width:"min(900px,96vw)",maxWidth:"96vw",boxSizing:"border-box",overflowX:"hidden"}} onClick={e=>e.stopPropagation()}><div className="modalhead"><h2>Final · {selected.ma_sp}</h2><button className="outline" onClick={()=>setSelected(null)}>Đóng</button></div><h3>{selected.ten_sp}</h3><div className="fields" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(190px,1fr))",gap:8}}>{[['MNV',selected.mnv],['SL đếm gốc',fmt(selected.sl_goc)],['SL trên sổ',fmt(selected.sl_so)],['Chênh lệch cũ',fmt(selected.chenh_cu)],['Tổng +/- QĐ',fmt(selected.delta)],['SL đếm mới',fmt(selected.sl_moi)],['Chênh lệch mới',fmt(selected.chenh_moi)],['GT chênh lệch mới',selected.gt_moi===null?'Chưa xác định':fmt(selected.gt_moi)],['Trạng thái Admin',adminStatus(selected)],['QR / Barcode',selected.qr_value],['Số bản ghi điều chỉnh',selected.so_lan]].map(([k,v])=><div key={k}><b>{k}</b><span>{v}</span></div>)}</div><h3>Chi tiết khu vực sau kiểm kê ({(detailData.get(selected.ma_sp)||[]).length} dòng)</h3>{detailBusy&&<p>Đang tải khu vực...</p>}{detailError&&<p className="warning">{detailError}</p>}<div className="tablewrap" style={{maxWidth:"100%",overflowX:"auto"}}><table style={{fontSize:12,whiteSpace:"normal"}}><thead><tr><th>Nguồn</th><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL gốc</th><th>+/- SL</th><th>SL thực tế cuối</th></tr></thead><tbody>{(detailData.get(selected.ma_sp)||[]).map((line,i)=><tr key={line.identity||i}><td>{line.source}</td><td>{line.barcode||'—'}</td><td>{line.kv||'—'}</td><td>{line.dvt||'—'}</td><td>{line.sl_nhap??'—'}</td><td>{fmt(line.base)}</td><td className={line.delta<0?'negative':'positive'}>{fmt(line.delta)}</td><td><b>{fmt(line.actual)}</b></td></tr>)}</tbody></table>{!detailBusy&&!detailError&&!(detailData.get(selected.ma_sp)||[]).length&&<p className="empty">Không có chi tiết khu vực</p>}</div></div></div>}
+   {selected&&<div className="overlay" onClick={()=>setSelected(null)}><div className="panel modal inv-modal" style={{width:'min(1000px,96vw)',maxWidth:'96vw',boxSizing:'border-box',overflowX:'auto'}} onClick={e=>e.stopPropagation()}>
+    <div className="modalhead"><h2>Chi tiết mã {selected.ma_sp}</h2><button className="outline" onClick={()=>setSelected(null)}>Đóng</button></div>
+    <h3>{selected.ten_sp}</h3><p>MNV: {selected.mnv||'—'} · Trạng thái Admin: {adminStatus(selected)}</p>
+    <h3>1. Chênh lệch cũ (theo DSCL)</h3>
+    <div className="inv-kpis inv-detail-kpis">
+     <div><small>SL đếm gốc</small><strong>{fmt(originalCount)}</strong></div>
+     <div><small>SL trên sổ</small><strong>{fmt(detailProduct?.book)}</strong></div>
+     <div><small>Lượng chênh lệch</small><strong>{fmt(originalCount-number(detailProduct?.book))}</strong></div>
+     <div><small>GT chênh lệch</small><strong>{fmt(detailProduct?.gt_chenh_lech)}</strong></div>
+     <div><small>ĐVT</small><strong>{detailProduct?.dvt_co_ban||selected.dvt||'—'}</strong></div>
+    </div>
+    <h3>2. Sau kiểm tra (cập nhật từ khu vực)</h3>
+    <div className="inv-kpis inv-detail-kpis">
+     <div><small>Tổng +/- SL</small><strong>{fmt(number(detailProduct?.delta)+pendingDelta)}</strong></div>
+     <div><small>SL đếm hiện tại</small><strong>{fmt(currentCount)}</strong></div>
+     <div><small>Chênh lệch hiện tại</small><strong>{fmt(currentCount-number(detailProduct?.book))}</strong></div>
+    </div>
+    {detailBusy&&<p>Đang tải chi tiết...</p>}{detailError&&<div className="warning">{detailError}</div>}
+    <h3>Chi tiết CT_KV ({detailLines.length} dòng)</h3>
+    <div className="tablewrap" style={{maxWidth:'100%',overflowX:'auto'}}><table style={{whiteSpace:'normal',fontSize:12}}><thead><tr><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL đếm</th><th>SL thực tế</th><th>Trạng thái</th></tr></thead><tbody>
+     {detailLines.map(d=><tr key={d.identity}><td className="barcode-cell" style={{overflowWrap:'anywhere'}}>{d.barcode||'Chưa có Barcode'}</td><td>{d.kv||'—'}</td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.saved)}</td><td><div style={{display:'flex',alignItems:'center',gap:4}}><button className="outline small" disabled={savingDetail||d.source==='BC'} onClick={()=>setEdits(v=>({...v,[d.identity]:Math.max(0,actualLine(d)-1)}))}>−</button><input type="number" min="0" style={{width:86}} disabled={savingDetail||d.source==='BC'} value={edits[d.identity]??d.saved} onChange={e=>setEdits(v=>({...v,[d.identity]:e.target.value}))}/><button className="outline small" disabled={savingDetail||d.source==='BC'} onClick={()=>setEdits(v=>({...v,[d.identity]:actualLine(d)+1}))}>+</button></div></td><td>{d.source}</td></tr>)}
+    </tbody></table>{!detailBusy&&!detailError&&!detailLines.length&&<p className="empty">Chưa có dòng CT_KV tương ứng.</p>}</div>
+    <div className="panel" style={{padding:16,margin:'14px 0'}}><h3>Thêm khu vực mới</h3><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Khu vực mới<input placeholder="Ví dụ A3" value={newKv.khu_vuc} onChange={e=>setNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label><label>SL thực tế (quy đổi)<input type="number" min="0" value={newKv.sl_thuc_te} onChange={e=>setNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label></div></div>
+    <button disabled={savingDetail||detailBusy||!!detailError||!detailProduct} onClick={saveDetail}>{savingDetail?'Đang cập nhật...':'Cập nhật đã kiểm'}</button>
+    <p className="inv-hint">Cách tính SL giống Danh sách mã hàng: SL DSCL + tổng điều chỉnh + thay đổi đang nhập. Final được đồng bộ sau khi lưu bằng RPC hiện có.</p>
+   </div></div>}
  </div>;
 }
