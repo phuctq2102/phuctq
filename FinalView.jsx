@@ -97,17 +97,17 @@ export default function FinalView(){
   const dc=await fetchAll('dieu_chinh',[],1000);
   const codes=[...new Set(dc.filter(valid).map(c=>key(c.ma_sp)).filter(Boolean))];
   if(!codes.length)return {rows:[],details:new Map(),checks:new Map()};
-  const [assignments,ds,ct,bc,checks]=await Promise.all([
+  const [assignments,ds,ct,bc]=await Promise.all([
    queryRows('phan_cong',codes,'ma_sp,mnv,trang_thai'),
    queryRows('dscl',codes,'*'),
    queryRows('ct_kv',codes,'*'),
-   queryRows('bc',codes,'*'),
-   queryRows('admin_final_check',codes,'*')
+   queryRows('bc',codes,'*')
   ]);
   const products=new Map(ds.map(p=>[key(p.ma_sp),p]));
   if(!products.size && codes.length)throw new Error('Có điều chỉnh nhưng không đọc được DSCL cho các mã: '+codes.slice(0,5).join(', '));
   const result=summarizeFinal(assignments,products,dc,ct).map(r=>({...r,qr_value:pickQrBarcode(r.ma_sp,r.dvt,ct,bc)}));
-  return {rows:result,details:buildDetails(ct,dc),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
+  const {data:checks,error:checkError}=await supabase.from('admin_final_check').select('*').in('ma_sp',codes.slice(0,80));
+  return {rows:result,details:buildDetails(ct,dc),checks:new Map((checkError?[]:(checks||[])).map(x=>[key(x.ma_sp),x]))};
  }
  async function reload(){
   setBusy(true);setError('');
@@ -120,7 +120,7 @@ export default function FinalView(){
   }catch(e){setError('Không tải được Final: '+(e?.message||String(e)));setRows([])}
   finally{setBusy(false)}
  }
- useEffect(()=>{reload();const onFocus=()=>reload();window.addEventListener('focus',onFocus);return()=>window.removeEventListener('focus',onFocus)},[]);
+ useEffect(()=>{reload();const onFocus=()=>reload();const onVisible=()=>{if(document.visibilityState==='visible')reload()};window.addEventListener('focus',onFocus);document.addEventListener('visibilitychange',onVisible);const timer=setInterval(()=>{if(document.visibilityState==='visible')reload()},15000);return()=>{window.removeEventListener('focus',onFocus);document.removeEventListener('visibilitychange',onVisible);clearInterval(timer)}},[]);
  const adminStatus=r=>approvals.get(r.ma_sp)?.revision===signature(r)?'Đã kiểm':'Chưa kiểm';
  async function confirmAdmin(r){
   setBusy(true);setError('');try{
