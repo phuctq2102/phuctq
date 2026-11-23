@@ -71,7 +71,7 @@ export function buildDetails(ctRows,corrections){
 
 export default function FinalView(){
  const [exportBusy,setExportBusy]=useState(false);
- const [detailLines,setDetailLines]=useState([]),[detailLoading,setDetailLoading]=useState(false),[detailSaving,setDetailSaving]=useState(false),[detailEdits,setDetailEdits]=useState({}),[detailNewKv,setDetailNewKv]=useState({khu_vuc:'',sl_thuc_te:''});
+ const [detailLines,setDetailLines]=useState([]),[detailBusy,setDetailBusy]=useState(false),[detailEdits,setDetailEdits]=useState({}),[detailNewKv,setDetailNewKv]=useState({khu_vuc:'',sl_thuc_te:''}),[detailSaving,setDetailSaving]=useState(false);
  const [detailData,setDetailData]=useState(new Map()),[rows,setRows]=useState([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[search,setSearch]=useState(''),[status,setStatus]=useState('all'),[page,setPage]=useState(0),[selected,setSelected]=useState(null),[approvals,setApprovals]=useState(new Map());
  // Query only products with corrections. Fetching the entire DSCL/CT_KV/BC
  // was forcing Final to wait for thousands of unrelated rows.
@@ -124,71 +124,74 @@ export default function FinalView(){
   const channel=supabase.channel('v10-final-live').on('postgres_changes',{event:'*',schema:'public',table:'final_lines'},refresh).subscribe();
   return()=>{window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',refresh);supabase.removeChannel(channel)};
  },[]);
- async function openFinalDetail(r){
-  setSelected(r);setDetailLines([]);setDetailEdits({});setDetailNewKv({khu_vuc:'',sl_thuc_te:''});setDetailLoading(true);setError('');
-  try{
-   const [ct,changes]=await Promise.all([
-    supabase.from('ct_kv').select('*').eq('ma_sp',r.ma_sp).limit(1000),
-    supabase.from('dieu_chinh').select('*').eq('ma_sp',r.ma_sp).order('created_at',{ascending:true}).limit(1000)
+ async function openDetail(r){
+  setSelected(r);setDetailLines([]);setDetailEdits({});setDetailNewKv({khu_vuc:'',sl_thuc_te:''});setDetailBusy(true);setError('');
+  try {
+   const [ct,bc,changes]=await Promise.all([
+    supabase.from('ct_kv').select('id,ma_sp,barcode,khu_vuc,dvt_nhap,sl_nhap,sl_dem').eq('ma_sp',r.ma_sp).limit(1000),
+    supabase.from('bc').select('id,ma_sp,barcode,khu_vuc,dvt_co_ban,sl_dem').eq('ma_sp',r.ma_sp).limit(1000),
+    supabase.from('dieu_chinh').select('id,ma_sp,ct_kv_id,loai_dieu_chinh,khu_vuc_moi,sl_moi,sl_chenh_lech,trang_thai_duyet,created_at,ghi_chu').eq('ma_sp',r.ma_sp).order('created_at',{ascending:true}).limit(1000)
    ]);
-   if(ct.error)throw ct.error;if(changes.error)throw changes.error;
-   const validChanges=(changes.data||[]).filter(valid);
+   if(ct.error)throw ct.error;if(bc.error)throw bc.error;if(changes.error)throw changes.error;
+   const ctRows=ct.data||[],bcRows=bc.data||[],corrections=(changes.data||[]).filter(valid);
    const latest=new Map();
-   for(const c of validChanges){if(c.ct_kv_id!=null)latest.set(key(c.ct_kv_id),c)}
-   const base=(ct.data||[]).map(c=>({
-    id:c.id,identity:'ct:'+c.id,source:'CT_KV',barcode:c.barcode||'',kv:latest.get(key(c.id))?.khu_vuc_moi||c.khu_vuc||'',
-    dvt:c.dvt_nhap||'',sl_nhap:c.sl_nhap,actual:number(latest.get(key(c.id))?.sl_moi??c.sl_dem),original:number(c.sl_dem)
-   }));
-   const added=new Map();
-   for(const c of validChanges.filter(x=>isNew(x))){
-    const id=key(c.ma_dong_moi)||'kv:'+norm(c.khu_vuc_moi);
-    added.set(id,{id:c.id,identity:'new:'+id,source:'KV mới',barcode:'',kv:c.khu_vuc_moi||'',dvt:'',sl_nhap:null,actual:number(c.sl_moi),original:0});
-   }
-   setDetailLines([...base,...added.values()]);
+   for(const c of corrections)if(c.ct_kv_id!=null)latest.set(key(c.ct_kv_id),c);
+   const useBC=(number(r.sl_goc)===0&&bcRows.length>0)||(!ctRows.length&&bcRows.length>0);
+   const source=useBC?bcRows:ctRows;
+   const regular=source.map((d,i)=>{
+    const c=latest.get(key(d.id));
+    return {identity:(useBC?'bc:':'ct:')+key(d.id??i),id:d.id,source:useBC?'BC':'CT_KV',barcode:d.barcode||'',kv:c?.khu_vuc_moi||d.khu_vuc||'',dvt:d.dvt_nhap||d.dvt_co_ban||'',sl_nhap:d.sl_nhap,actual:useBC?number(d.sl_dem):number(c?.sl_moi??d.sl_dem)};
+   });
+   const added=corrections.filter(isNew).map(c=>({identity:'new:'+c.id,id:c.id,source:'KV_MOI',barcode:'',kv:c.khu_vuc_moi||'',dvt:'',sl_nhap:null,actual:number(c.sl_moi)}));
+   setDetailLines([...regular,...added]);
   }catch(e){setError('Không tải được chi tiết KV: '+e.message)}
-  finally{setDetailLoading(false)}
+  finally{setDetailBusy(false)}
  }
- async function saveFinalDetail(){
+ const detailActual=d=>detailEdits[d.identity]?.sl!==undefined?Number(detailEdits[d.identity].sl):d.actual;
+ const detailKv=d=>detailEdits[d.identity]?.kv??d.kv;
+ function updateDetail(d,field,value){setDetailEdits(old=>({...old,[d.identity]:{...(old[d.identity]||{}),[field]:value}}))}
+ async function saveDetail(){
   if(!selected||detailSaving)return;
-  const changed=detailLines.filter(d=>detailEdits[d.identity]!==undefined&&Number(detailEdits[d.identity])!==d.actual);
-  const kv=key(detailNewKv.khu_vuc),raw=key(detailNewKv.sl_thuc_te);
-  if(!changed.length&&!kv&&!raw)return;
-  if(changed.some(d=>detailEdits[d.identity]===''||!Number.isFinite(Number(detailEdits[d.identity]))||Number(detailEdits[d.identity])<0)||((kv||raw)&&(!kv||raw===''||!Number.isFinite(Number(raw))||Number(raw)<0))){
-   setError('SL thực tế phải là số không âm. Thêm KV cần đủ khu vực và SL.');return;
-  }
+  const changed=detailLines.filter(d=>detailActual(d)!==d.actual||detailKv(d)!==d.kv);
+  const newArea=key(detailNewKv.khu_vuc),raw=key(detailNewKv.sl_thuc_te);
+  if(!changed.length&&!newArea&&!raw)return;
+  if(changed.some(d=>!Number.isFinite(detailActual(d))||detailActual(d)<0)||((newArea||raw)&&(!newArea||raw===''||!Number.isFinite(Number(raw))||Number(raw)<0))){setError('Vui lòng nhập SL hợp lệ và đầy đủ Khu vực + SL khi thêm KV.');return}
+  if(changed.some(d=>d.source==='BC')){setError('Dòng BC không có CT_KV ID để sửa. Hãy dùng Thêm khu vực mới.');return}
   setDetailSaving(true);setError('');
   try{
    const {data:auth}=await supabase.auth.getUser();
-   const who=selected.mnv||auth?.user?.email||'ADMIN';
+   const who=auth?.user?.email||'ADMIN';
    for(const d of changed){
-    const value=Number(detailEdits[d.identity]);
-    if(d.source==='KV mới'){
-     const {error}=await supabase.from('dieu_chinh').update({sl_moi:value,sl_chenh_lech:value}).eq('id',d.id);
-     if(error)throw error;
+    const sl=detailActual(d),kv=detailKv(d);
+    if(d.source==='KV_MOI'){
+     // Existing schema treats a newly-added KV as one correction record.
+     const {error:e}=await supabase.from('dieu_chinh').update({sl_moi:sl,sl_chenh_lech:sl,khu_vuc_moi:kv}).eq('id',d.id);
+     if(e)throw e;
     }else{
-     const {error}=await supabase.from('dieu_chinh').insert({
-      ma_sp:selected.ma_sp,ct_kv_id:d.id,loai_dieu_chinh:'SUA_SO_LUONG',
-      khu_vuc_cu:d.kv||null,khu_vuc_moi:d.kv||null,sl_cu:d.actual,sl_moi:value,
-      sl_chenh_lech:value-d.actual,mnv:selected.mnv||null,nguoi_cap_nhat:who,
-      ghi_chu:'Admin sửa từ Final theo khu vực',trang_thai_duyet:'Không cần duyệt'
+     const {error:e}=await supabase.from('dieu_chinh').insert({
+      ma_sp:selected.ma_sp,ct_kv_id:d.id,loai_dieu_chinh:kv!==d.kv?'SUA_KV':'SUA_SO_LUONG',
+      khu_vuc_cu:d.kv||null,khu_vuc_moi:kv||null,sl_cu:d.actual,sl_moi:sl,sl_chenh_lech:sl-d.actual,
+      mnv:selected.mnv||null,nguoi_cap_nhat:who,ghi_chu:'Admin cập nhật KV từ Final',trang_thai_duyet:'Không cần duyệt'
      });
-     if(error)throw error;
+     if(e)throw e;
     }
    }
-   if(kv){
-    const value=Number(raw);
-    const {error}=await supabase.from('dieu_chinh').insert({
+   if(newArea){
+    const sl=Number(raw);
+    const {error:e}=await supabase.from('dieu_chinh').insert({
      ma_sp:selected.ma_sp,ct_kv_id:null,loai_dieu_chinh:'THEM_KV',
-     khu_vuc_cu:null,khu_vuc_moi:kv,sl_cu:0,sl_moi:value,sl_chenh_lech:value,
-     mnv:selected.mnv||null,nguoi_cap_nhat:who,ghi_chu:'Admin thêm KV từ Final',
-     trang_thai_duyet:'Không cần duyệt'
+     khu_vuc_cu:null,khu_vuc_moi:newArea,sl_cu:0,sl_moi:sl,sl_chenh_lech:sl,
+     mnv:selected.mnv||null,nguoi_cap_nhat:who,ghi_chu:'Admin thêm KV từ Final',trang_thai_duyet:'Không cần duyệt'
     });
-    if(error)throw error;
+    if(e)throw e;
    }
+   // Refresh the derived Final table, then verify its persisted result.
    const {error:refreshError}=await supabase.rpc('v10_admin_refresh_final',{p_ma_sp:selected.ma_sp});
-   if(refreshError)throw Error('Đã lưu điều chỉnh nhưng chưa đồng bộ Final: '+refreshError.message);
+   if(refreshError)throw Error('Đã ghi điều chỉnh nhưng làm mới Final thất bại: '+refreshError.message);
+   const {error:checkError}=await supabase.from('final_lines').select('ma_sp').eq('ma_sp',selected.ma_sp).limit(1);
+   if(checkError)throw checkError;
    setSelected(null);await reload();
-  }catch(e){setError('Không cập nhật được KV tại Final: '+e.message)}
+  }catch(e){setError('Không cập nhật được Final: '+e.message)}
   finally{setDetailSaving(false)}
  }
  const adminStatus=r=>approvals.get(r.ma_sp)?.revision===signature(r)?'Đã kiểm':'Chưa kiểm';
@@ -266,12 +269,12 @@ export default function FinalView(){
   <div className="inv-kpis"><div><small>Tổng mã</small><strong>{rows.length}</strong></div><div><small>Có điều chỉnh</small><strong>{modified}</strong></div><div><small>Đã kiểm</small><strong className="green">{done}</strong></div><div><small>Chưa kiểm</small><strong className="orange">{rows.length-done}</strong></div></div>
   <div className="panel"><div className="employee-filter"><input placeholder="Tìm mã SP, tên sản phẩm, MNV..." value={search} onChange={e=>{setSearch(e.target.value);setPage(0)}}/><select value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">Tất cả trạng thái</option><option value="Đã kiểm">Đã kiểm</option><option value="Chưa kiểm">Chưa kiểm</option></select><span>{filtered.length} mã</span></div>
   {error&&<div className="warning">{error}</div>}{busy&&<p>Đang tổng hợp Final...</p>}
-  <div className="tablewrap final-table"><table><thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th>MNV</th><th>SL đếm gốc</th><th>SL trên sổ</th><th>Chênh lệch cũ</th><th>GT lệch cũ</th><th>+/- QĐ</th><th>SL đếm mới</th><th>Chênh lệch mới</th><th>GT lệch mới*</th><th>Trạng thái Admin</th><th>QR</th><th>Xác nhận Admin</th><th>Chi tiết</th></tr></thead><tbody>{filtered.slice(page*100,(page+1)*100).map(r=><tr key={r.ma_sp}><td><b>{r.ma_sp}</b></td><td className="inv-name">{r.ten_sp}</td><td>{r.mnv}</td><td>{fmt(r.sl_goc)}</td><td>{fmt(r.sl_so)}</td><td>{fmt(r.chenh_cu)}</td><td>{fmt(r.gt_cu)}</td><td className={r.delta<0?'negative':r.delta>0?'positive':''}>{fmt(r.delta)}</td><td><b>{fmt(r.sl_moi)}</b></td><td className={r.chenh_moi<0?'negative':'positive'}>{fmt(r.chenh_moi)}</td><td>{r.gt_moi===null?'—':fmt(r.gt_moi)}</td><td><span className={'inv-status '+(adminStatus(r)==='Đã kiểm'?'done':'pending')}>{adminStatus(r)}</span></td><td><img src={qrUrl(r)} alt={'QR '+r.qr_value} width="72" height="72" loading="lazy"/><div style={{fontSize:10,overflowWrap:'anywhere',maxWidth:130}}>{r.qr_value}</div></td><td><button className="small" disabled={busy||adminStatus(r)==='Đã kiểm'} onClick={()=>confirmAdmin(r)}>Xác nhận đã kiểm</button></td><td><button className="small" onClick={()=>openFinalDetail(r)}>Xem</button></td></tr>)}</tbody></table>{!busy&&!filtered.length&&<p className="empty">Không có mã phù hợp</p>}</div>
+  <div className="tablewrap final-table"><table style={{whiteSpace:"normal"}}><thead><tr><th>Mã SP</th><th>Tên sản phẩm</th><th>MNV</th><th>SL đếm gốc</th><th>SL trên sổ</th><th>Chênh lệch cũ</th><th>GT lệch cũ</th><th>+/- QĐ</th><th>SL đếm mới</th><th>Chênh lệch mới</th><th>GT lệch mới*</th><th>Trạng thái Admin</th><th>QR</th><th>Xác nhận Admin</th><th>Chi tiết</th></tr></thead><tbody>{filtered.slice(page*100,(page+1)*100).map(r=><tr key={r.ma_sp}><td><b>{r.ma_sp}</b></td><td className="inv-name" style={{minWidth:170,maxWidth:280,whiteSpace:"normal",overflowWrap:"anywhere",verticalAlign:"middle"}}>{r.ten_sp}</td><td>{r.mnv}</td><td>{fmt(r.sl_goc)}</td><td>{fmt(r.sl_so)}</td><td>{fmt(r.chenh_cu)}</td><td>{fmt(r.gt_cu)}</td><td className={r.delta<0?'negative':r.delta>0?'positive':''}>{fmt(r.delta)}</td><td>{fmt(r.sl_moi)}</td><td className={r.chenh_moi<0?'negative':'positive'}>{fmt(r.chenh_moi)}</td><td>{r.gt_moi===null?'—':fmt(r.gt_moi)}</td><td><span className={'inv-status '+(adminStatus(r)==='Đã kiểm'?'done':'pending')}>{adminStatus(r)}</span></td><td><img src={qrUrl(r)} alt={'QR '+r.qr_value} width="72" height="72" loading="lazy"/><div style={{fontSize:10,overflowWrap:'anywhere',maxWidth:130}}>{r.qr_value}</div></td><td><button className="small" disabled={busy||adminStatus(r)==='Đã kiểm'} onClick={()=>confirmAdmin(r)}>Xác nhận đã kiểm</button></td><td><button className="small" onClick={()=>openDetail(r)}>Xem</button></td></tr>)}</tbody></table>{!busy&&!filtered.length&&<p className="empty">Không có mã phù hợp</p>}</div>
   <div className="pager"><button className="outline" disabled={page===0} onClick={()=>setPage(v=>v-1)}>Trước</button><span>Trang {page+1}/{Math.max(1,Math.ceil(filtered.length/100))}</span><button className="outline" disabled={(page+1)*100>=filtered.length} onClick={()=>setPage(v=>v+1)}>Sau</button></div>
   <p className="inv-hint">* GT lệch mới là ước tính theo đơn giá suy ra từ DSCL; nếu chênh lệch cũ bằng 0 thì để trống. Final chỉ hiển thị mã có thay đổi SL ròng khác 0; trạng thái xác nhận riêng của Admin. QR sử dụng dịch vụ ảnh bên ngoài, cần kết nối Internet. Nút xuất Excel + QR tải toàn bộ các mã theo bộ lọc hiện tại, không chỉ trang đang xem. File QR nhúng cần ExcelJS từ CDN và ảnh QR tải được qua Internet.</p></div>
   {selected&&<div className="overlay" onClick={()=>setSelected(null)}><div className="panel modal" onClick={e=>e.stopPropagation()}><div className="modalhead"><h2>Final · {selected.ma_sp}</h2><button className="outline" onClick={()=>setSelected(null)}>Đóng</button></div><h3>{selected.ten_sp}</h3><div className="fields">{[['MNV',selected.mnv],['SL đếm gốc',fmt(selected.sl_goc)],['SL trên sổ',fmt(selected.sl_so)],['Chênh lệch cũ',fmt(selected.chenh_cu)],['Tổng +/- QĐ',fmt(selected.delta)],['SL đếm mới',fmt(selected.sl_moi)],['Chênh lệch mới',fmt(selected.chenh_moi)],['GT chênh lệch mới',selected.gt_moi===null?'Chưa xác định':fmt(selected.gt_moi)],['Trạng thái Admin',adminStatus(selected)],['QR / Barcode',selected.qr_value],['Số bản ghi điều chỉnh',selected.so_lan]].map(([k,v])=><div key={k}><b>{k}</b><span>{v}</span></div>)}</div><h3>Chi tiết khu vực ({detailLines.length} dòng)</h3>
- {detailLoading?<p>Đang tải chi tiết...</p>:<div className="tablewrap"><table><thead><tr><th>Nguồn</th><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL hiện tại</th><th>− / +</th><th>SL thực tế</th></tr></thead><tbody>{detailLines.map(d=><tr key={d.identity}><td>{d.source}</td><td>{d.barcode||'—'}</td><td>{d.kv||'—'}</td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.actual)}</td><td><div style={{display:'flex',gap:5}}><button className="small outline" onClick={()=>setDetailEdits(v=>({...v,[d.identity]:String(Math.max(0,number(v[d.identity]??d.actual)-1))}))}>−</button><button className="small outline" onClick={()=>setDetailEdits(v=>({...v,[d.identity]:String(number(v[d.identity]??d.actual)+1)}))}>+</button></div></td><td><input type="number" min="0" step="any" style={{width:110}} value={detailEdits[d.identity]??String(d.actual)} onChange={e=>setDetailEdits(v=>({...v,[d.identity]:e.target.value}))}/></td></tr>)}</tbody></table>{!detailLines.length&&<p className="empty">Chưa có khu vực. Có thể thêm KV mới bên dưới.</p>}</div>}
- <div className="panel" style={{padding:14,marginTop:14}}><h3>Thêm khu vực mới</h3><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Khu vực<input value={detailNewKv.khu_vuc} onChange={e=>setDetailNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label><label>SL thực tế (quy đổi)<input type="number" min="0" value={detailNewKv.sl_thuc_te} onChange={e=>setDetailNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label></div></div>
- <button disabled={detailLoading||detailSaving} onClick={saveFinalDetail}>{detailSaving?'Đang lưu...':'Cập nhật đã kiểm'}</button></div></div>}
+ {detailBusy?<p>Đang tải chi tiết...</p>:<div className="tablewrap"><table><thead><tr><th>Nguồn</th><th>Barcode</th><th>Khu vực</th><th>ĐVT nhập</th><th>SL nhập</th><th>SL hiện tại</th><th>Điều chỉnh</th></tr></thead><tbody>{detailLines.map(d=><tr key={d.identity}><td>{d.source}</td><td style={{overflowWrap:'anywhere'}}>{d.barcode||'—'}</td><td><input style={{minWidth:110,maxWidth:180}} value={detailKv(d)} onChange={e=>updateDetail(d,'kv',e.target.value)} /></td><td>{d.dvt||'—'}</td><td>{d.sl_nhap??'—'}</td><td>{fmt(d.actual)}</td><td><div style={{display:'flex',alignItems:'center',gap:5}}><button className="small outline" onClick={()=>updateDetail(d,'sl',String(Math.max(0,detailActual(d)-1)))}>−</button><input aria-label={'SL '+d.kv} type="number" min="0" step="any" style={{width:90}} value={detailEdits[d.identity]?.sl??String(d.actual)} onChange={e=>updateDetail(d,'sl',e.target.value)}/><button className="small outline" onClick={()=>updateDetail(d,'sl',String(detailActual(d)+1))}>+</button></div></td></tr>)}</tbody></table>{!detailLines.length&&<p className="empty">Chưa có chi tiết khu vực.</p>}</div>}
+ <div className="panel" style={{padding:12,marginTop:12}}><h3>Thêm khu vực mới</h3><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><label>Khu vực<input placeholder="Ví dụ A3" value={detailNewKv.khu_vuc} onChange={e=>setDetailNewKv(v=>({...v,khu_vuc:e.target.value}))}/></label><label>SL thực tế (quy đổi)<input type="number" min="0" step="any" value={detailNewKv.sl_thuc_te} onChange={e=>setDetailNewKv(v=>({...v,sl_thuc_te:e.target.value}))}/></label></div></div>
+ <button disabled={detailBusy||detailSaving} onClick={saveDetail}>{detailSaving?'Đang cập nhật...':'Cập nhật đã kiểm'}</button></div></div>}
  </div>;
 }
