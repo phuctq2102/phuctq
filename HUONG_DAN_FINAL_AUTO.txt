@@ -1,0 +1,11 @@
+V10 - CHUYEN CO CHE DONG BO FINAL TU GAS SANG SUPABASE
+
+1. SAO LUU bang final_lines va dieu_chinh trong Supabase truoc khi chay SQL.
+2. Mo Supabase SQL Editor bang tai khoan quan tri, chay SUPABASE_FINAL_AUTO.sql mot lan.
+3. Xem bang ket qua cuoi: 10005170 delta +1; 10005201 delta +2; 10141959 delta +2 (neu du lieu khong thay doi).
+4. Kiem tra tab Final va tai lai trang. Neu giao dien van hien 0, kiem tra RLS SELECT tren dieu_chinh, dscl, ct_kv, final_lines.
+5. Sau moi INSERT/UPDATE/DELETE dieu_chinh, trigger dong bo final_lines trong cung transaction. Neu ghi final_lines that bai, thao tac ghi dieu_chinh se bao loi (khong am tham bo qua).
+6. SQL khong xoa CT_KV, DSCL hay BC. Barcode trong DS ma hang tiep tuc an theo ban React truoc.
+7. SQL luu 1 dong tong hop cho moi ma SP co thay doi, KHONG phai chi tiet tung KV. Phan QR/Excel cua giao dien React van dung logic hien tai.
+8. Quan trong: nhung tai khoan NV khong co quyen INSERT/UPDATE dieu_chinh se van can chinh RLS rieng. Khong tat RLS.
+9. Neu co nhieu session sua cung mot ma dong thoi, can kiem thu concurrency tren moi truong test truoc khi dua vao production.
