@@ -25,16 +25,25 @@ export function summarizeFinal(assignments,products,corrections,ctRows){
  }
  const original=new Map(ctRows.map(r=>[key(r.id),number(r.sl_dem)]));
  const output=new Map();
- for(const a of assignments){
-  const code=key(a.ma_sp);if(!code)continue;
-  const p=products.get(code)||{};
+ const assignmentByCode=new Map(assignments.map(a=>[key(a.ma_sp),a]));
+ // Final is driven by actual corrections, NOT by the assignment table.
+ // Unassigned products and admin edits must still appear.
+ for(const code of byProduct.keys()){
+  const a=assignmentByCode.get(code)||{};
+  const p=products.get(code);
+  if(!p)continue; // Cannot calculate against DSCL without original count.
   const changes=(byProduct.get(code)||[]).slice().sort((a,b)=>stamp(a).localeCompare(stamp(b))||number(a.id)-number(b.id));
   const latest=new Map(),additions=new Map(),first=new Map();
   for(const c of changes){
    if(isNew(c)){const identity=key(c.ma_dong_moi)||('id:'+key(c.id));additions.set(identity,c);continue;}
    const id=key(c.ct_kv_id);
    if(id){if(!first.has(id))first.set(id,c);latest.set(id,c);}
-   else if(c.id!=null)latest.set('unlinked:'+key(c.id),c);
+   else if(c.id!=null){
+    // Legacy edits may have no CT_KV id: use latest value for the same
+    // product/area rather than adding every historical edit.
+    const area=norm(c.khu_vuc_cu||c.khu_vuc_moi);
+    latest.set('unlinked:'+area,c);
+   }
   }
   let delta=0;
   for(const [id,c] of latest){
@@ -96,6 +105,7 @@ export default function FinalView(){
    queryRows('admin_final_check',codes,'*')
   ]);
   const products=new Map(ds.map(p=>[key(p.ma_sp),p]));
+  if(!products.size && codes.length)throw new Error('Có điều chỉnh nhưng không đọc được DSCL cho các mã: '+codes.slice(0,5).join(', '));
   const result=summarizeFinal(assignments,products,dc,ct).map(r=>({...r,qr_value:pickQrBarcode(r.ma_sp,r.dvt,ct,bc)}));
   return {rows:result,details:buildDetails(ct,dc),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
  }
