@@ -1,0 +1,19 @@
+BẢN SỬA TRỰC TIẾP TỪ phuctq-main (2)(1).zip
+
+Các file ứng dụng thực sự dùng: src/InventoryList.jsx, src/FinalView.jsx, src/style.css.
+1. Xóa hẳn cột Barcode khỏi bảng Danh sách mã hàng; giữ tìm kiếm Barcode.
+2. Final giữ các cột, thay ô nhập SL/Lưu trên bảng bằng SL đếm mới chỉ đọc.
+3. Final nút Xem mở chi tiết KV: sửa tên KV, +/- SL, nhập SL, thêm KV mới.
+4. Căn lề, xuống dòng tên dài và căn phải số lượng.
+5. Sau lưu, gọi RPC v10_admin_refresh_final và kiểm tra final_lines.
+
+ĐÃ KIỂM TRA: kiểm tra cú pháp JSX bằng TypeScript parser, không phát hiện lỗi cú pháp.
+CHƯA KIỂM TRA: npm run build (môi trường thiếu node_modules, npm offline không tải được), quyền RLS, Supabase thực tế, Vercel.
+
+CẢNH BÁO QUAN TRỌNG:
+- Các thao tác ghi điều chỉnh nhiều dòng chưa là một transaction duy nhất. Nếu ghi một phần thất bại, cần đối chiếu dữ liệu.
+- Sửa KV mới hiện cập nhật bản ghi dieu_chinh hiện có; chưa tạo lịch sử riêng cho mỗi lần sửa KV mới.
+- Phần Danh sách mã hàng và Final còn dùng hai cách tổng hợp khác nhau; cần đối chiếu thực tế.
+- Bản này chưa chứng minh đồng bộ hoàn toàn giữa nhân viên và Final.
+- Cần RPC v10_admin_refresh_final sẵn có trên Supabase; KHÔNG chạy SQL tự động.
+- Không đóng gói .env.local để tránh phát tán cấu hình riêng.
