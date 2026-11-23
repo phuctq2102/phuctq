@@ -94,27 +94,38 @@ export default function FinalView(){
   return out;
  }
  async function loadFinal(){
-  const dc=await fetchAll('dieu_chinh',[],1000);
-  // Always use current correction records; do not require final_lines or assignment rows.
-  const codes=[...new Set(dc.filter(valid).map(c=>key(c.ma_sp)).filter(Boolean))];
+  // The database trigger maintains final_lines. It is the authoritative Final snapshot.
+  const snapshots=await fetchAll('final_lines',[],1000);
+  const active=snapshots.filter(r=>Math.abs(number(r.du_lieu_goc?.delta))>1e-9);
+  const codes=[...new Set(active.map(r=>key(r.ma_sp)).filter(Boolean))];
   if(!codes.length)return {rows:[],details:new Map(),checks:new Map()};
-  const [assignments,ds,ct,bc]=await Promise.all([
-   queryRows('phan_cong',codes,'ma_sp,mnv,trang_thai'),
-   queryRows('dscl',codes,'*'),
-   queryRows('ct_kv',codes,'*'),
-   queryRows('bc',codes,'*')
+  // These lookups are optional enrichment only; they must not suppress Final rows.
+  const optional=async(table,columns='*')=>{try{return await queryRows(table,codes,columns)}catch(e){console.warn('Final optional '+table,e);return []}};
+  const [ds,assignments,ct,bc,dc,checks]=await Promise.all([
+   optional('dscl','*'),optional('phan_cong','ma_sp,mnv,trang_thai'),
+   optional('ct_kv','*'),optional('bc','*'),optional('dieu_chinh','*'),
+   optional('admin_final_check','*')
   ]);
-  const products=new Map(ds.map(p=>[key(p.ma_sp),p]));
-  if(!products.size && codes.length)throw new Error('Có điều chỉnh nhưng không đọc được DSCL cho các mã: '+codes.slice(0,5).join(', '));
-  const result=summarizeFinal(assignments,products,dc,ct).map(r=>({...r,qr_value:pickQrBarcode(r.ma_sp,r.dvt,ct,bc)}));
-  let checks=[];
-  // Approval metadata is optional: never hide Final if this query fails.
-  for(let i=0;i<codes.length;i+=80){
-   const {data,error}=await supabase.from('admin_final_check').select('*').in('ma_sp',codes.slice(i,i+80));
-   if(error)break;checks.push(...(data||[]));
-  }
-  return {rows:result,details:buildDetails(ct,dc),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
+  const products=new Map(ds.map(r=>[key(r.ma_sp),r]));
+  const assigned=new Map(assignments.map(r=>[key(r.ma_sp),r]));
+  const rows=active.map(f=>{
+   const code=key(f.ma_sp),p=products.get(code)||{},a=assigned.get(code)||{};
+   const delta=number(f.du_lieu_goc?.delta),slNew=number(f.sl_dem);
+   const slOld=f.du_lieu_goc?.sl_dem_goc==null?slNew-delta:number(f.du_lieu_goc.sl_dem_goc);
+   const book=number(f.sl_so),oldDiff=slOld-book;
+   const oldValue=number(p.gt_chenh_lech);
+   const unit=oldDiff!==0&&p.gt_chenh_lech!=null?oldValue/oldDiff:null;
+   const revision=key(f.updated_at||f.created_at);
+   return {ma_sp:code,ten_sp:f.ten_sp||p.ten_sp||'',mnv:f.mnv||a.mnv||'',
+    sl_goc:slOld,sl_so:book,chenh_cu:oldDiff,gt_cu:p.gt_chenh_lech==null?null:oldValue,
+    delta,sl_moi:slNew,chenh_moi:number(f.chenh_lech),gt_moi:f.gt_chenh_lech==null?(unit===null?null:number(f.chenh_lech)*unit):number(f.gt_chenh_lech),
+    trang_thai:f.trang_thai||a.trang_thai||'Chưa kiểm',dvt:f.dvt_co_ban||p.dvt_co_ban||'',
+    so_lan:dc.filter(c=>key(c.ma_sp)===code).length,change_revision:revision,
+    qr_value:f.qr_content||pickQrBarcode(code,f.dvt_co_ban||p.dvt_co_ban||'',ct,bc)};
+  }).sort((a,b)=>a.ma_sp.localeCompare(b.ma_sp,'vi'));
+  return {rows,details:buildDetails(ct,dc),checks:new Map(checks.map(x=>[key(x.ma_sp),x]))};
  }
+
  async function reload(){
   setBusy(true);setError('');
   try{
