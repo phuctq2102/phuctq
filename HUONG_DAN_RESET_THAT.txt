@@ -1,0 +1,6 @@
+1. Supabase SQL Editor: chay 05_RESET_KY_KIEM_KE_THAT.sql (chi tao ham, KHONG xoa du lieu).
+2. GitHub: thay src/PeriodManager.jsx bang file trong ZIP, Commit.
+3. Vercel: kiem tra dung deployment.
+4. Admin: bam Reset ky kiem ke, nhap RESET, bam Xac nhan xoa du lieu. CHI KHI DO MOI XOA THAT.
+5. Tai lai trang sau khi Reset.
+Canh bao: Xoa vinh vien, khong co ban luu. Neu DB co trigger/FK phu thuoc vao cac bang tren, RPC se bao loi va rollback; can xem SQL schema de dieu chinh.
