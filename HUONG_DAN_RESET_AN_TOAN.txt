@@ -1,0 +1,7 @@
+RESET AN TOAN - 24/11/2026
+1. Thay code bang ZIP nay hoac chi thay src/PeriodManager.jsx.
+2. Vao Admin > Danh sach ma hang, chon Reset ky kiem ke.
+3. Kiem tra hop thoai va nut xac nhan thu.
+4. Ban nay KHONG xoa, KHONG goi RPC, KHONG dong so, KHONG luu lich su.
+5. Chua kich hoat xoa thuc te. BC va moi du lieu giu nguyen.
+6. File .env.local duoc LOAI KHOI ZIP de tranh lo thong tin cau hinh. Giu file .env.local dang co khi chay local, hoac cau hinh env tren Vercel.
