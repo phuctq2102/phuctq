@@ -166,7 +166,7 @@ export function summarizeHcxl(rows) {
   };
 }
 
-export function summarizePeriodCategories(rows, period) {
+export function summarizePeriodCategories(rows, period, rate) {
   const monthT = period.ngay_moi.slice(0, 7);
   const departments = new Map();
   const categories = new Map();
@@ -192,10 +192,14 @@ export function summarizePeriodCategories(rows, period) {
   }
 
   const sorted = groups => [...groups.values()].sort((a, b) => a.net - b.net || (a.name ?? '').localeCompare(b.name ?? '', 'vi'));
+  const withRatio = row => ({
+    ...row, ratio: row.value != null && row.revenue ? row.value / row.revenue : null,
+  });
   return {
-    departments: sorted(departments),
+    departments: sorted(departments).map(withRatio),
     categories: sorted(categories).map(row => ({
-      ...row, ratio: row.value != null && row.revenue ? row.value / row.revenue : null,
+      ...withRatio(row),
+      excess: row.value == null || row.revenue == null ? null : Math.min(row.value + row.revenue * rate, 0),
     })),
   };
 }

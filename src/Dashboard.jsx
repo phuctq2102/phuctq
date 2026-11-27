@@ -13,6 +13,7 @@ const integer = new Intl.NumberFormat('vi-VN');
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
 
+const lossRate = 0.003;
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const date = value => value.split('-').reverse().join('/');
 const tone = value => value < 0 ? 'negative' : value > 0 ? 'positive' : '';
@@ -106,7 +107,7 @@ export default function Dashboard() {
     let active = true;
     if (!period || sameMonth) return;
     readClkkGroups(period).then(rows => {
-      if (active) setPeriodResult({ period, summary: summarizeClkk(rows, period, 0.003), categories: summarizePeriodCategories(rows, period) });
+      if (active) setPeriodResult({ period, summary: summarizeClkk(rows, period, lossRate), categories: summarizePeriodCategories(rows, period, lossRate) });
     }).catch(error => {
       if (active) setPeriodResult({ period, error: error.message });
     });
@@ -236,6 +237,7 @@ export default function Dashboard() {
             <div><dt>Netoff</dt><dd className={tone(row.net)}>{money(row.net)}</dd></div>
             <div><dt>GT MCH3</dt><dd className={tone(row.value)}>{row.value == null ? 'N/A' : money(row.value)}</dd></div>
             <div><dt>Doanh thu</dt><dd>{row.revenue == null ? 'N/A' : money(row.revenue)}</dd></div>
+            <div><dt>Tỉ lệ MCH2</dt><dd className={tone(row.ratio)}>{row.ratio == null ? 'N/A' : percent.format(row.ratio)}</dd></div>
           </dl>
         </section>)}
       </div> : !isPeriodLoading && <p className="empty">Chưa có dữ liệu MCH2 cả kỳ.</p>}
@@ -243,10 +245,10 @@ export default function Dashboard() {
     <section className="panel dashboard-panel">
       <h2>Kết quả MCH3 (Cả kỳ)</h2>
       {groups.length ? <>
-        <p className="dashboard-caption">Lệch âm và dương cộng từ Netoff MCH3 từng tháng. Tỉ lệ MCH3 = GT MCH3 / doanh thu của nhóm.</p>
+        <p className="dashboard-caption">Lệch âm và dương cộng từ Netoff MCH3 từng tháng. Tỉ lệ MCH3 = GT MCH3 / doanh thu của nhóm. GT VĐM dùng định mức {percent.format(lossRate)}.</p>
         <div className="tablewrap dashboard-scroll">
           <table className="dashboard-mch-table">
-            <thead><tr>{['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+            <thead><tr>{['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3', 'GT VĐM MCH3'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
             <tbody>{groups.map(row => <tr key={JSON.stringify([row.parent, row.name])}>
               <th scope="row">{row.name}<small>{row.parent}</small></th>
               <td className={tone(row.negative)}>{money(row.negative)}</td>
@@ -254,6 +256,7 @@ export default function Dashboard() {
               <td className={tone(row.net)}>{money(row.net)}</td>
               <td className={tone(row.value)}>{row.value == null ? 'N/A' : money(row.value)}</td>
               <td className={tone(row.ratio)}>{row.ratio == null ? 'N/A' : percent.format(row.ratio)}</td>
+              <td className={tone(row.excess)}>{row.excess == null ? 'N/A' : money(row.excess)}</td>
             </tr>)}</tbody>
           </table>
         </div>

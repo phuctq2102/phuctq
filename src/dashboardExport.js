@@ -38,12 +38,12 @@ export function buildDashboardWorkbook({ inventory, catalog, summary, overview, 
     ], [39, 35], {1: money});
   }
   if (periodCategories) {
-    add('MCH2 ca ky', ['Ngành hàng', 'Netoff', 'GT MCH3', 'Doanh thu'],
-      periodCategories.departments.map(row => [row.name, row.net, row.value, row.revenue]),
-      [42, 20, 20, 20], {1:money,2:money,3:money});
-    add('MCH3 ca ky', ['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3'],
-      periodCategories.categories.map(row => [[row.name, row.parent].filter(Boolean).join(' · '), row.negative, row.positive, row.net, row.value, row.ratio]),
-      [55, 20, 20, 20, 20, 18], {1:money,2:money,3:money,4:money,5:'0.00%'});
+    add('MCH2 ca ky', ['Ngành hàng', 'Netoff', 'GT MCH3', 'Doanh thu', 'Tỉ lệ MCH2'],
+      periodCategories.departments.map(row => [row.name, row.net, row.value, row.revenue, row.ratio]),
+      [42, 20, 20, 20, 18], {1:money,2:money,3:money,4:'0.00%'});
+    add('MCH3 ca ky', ['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3', 'GT VĐM MCH3'],
+      periodCategories.categories.map(row => [[row.name, row.parent].filter(Boolean).join(' · '), row.negative, row.positive, row.net, row.value, row.ratio, row.excess]),
+      [55, 20, 20, 20, 20, 18, 20], {1:money,2:money,3:money,4:money,5:'0.00%',6:money});
   }
   add('MCH2', ['Mã MCH2','Tên MCH2','SL mã','Lệch âm','Lệch dương','Ròng','Tỉ trọng'], overview.parents.map(r => [r.code,r.name,r.productCount,r.negative,r.positive,r.net,r.share]), [18,38,14,20,20,20,14], {3:money,4:money,5:money,6:'0.0%'});
   add('MCH3', ['Mã MCH3','Ngành hàng','Dòng DSCL','Lệch âm','Lệch dương','Ròng'], summary.industries.map(r => [r.code,r.name,r.count,r.negative,r.positive,r.net]), [18,38,15,20,20,20], {3:money,4:money,5:money});
