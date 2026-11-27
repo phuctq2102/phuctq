@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 import { parseHcxl, parseSap, parseSchedule, parseStaff, readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
 import './clkkReport.css';
 import Bm8Notes from './Bm8Notes';
-import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
+import { periodKey, readClkkGroups, readClkkPeriods, readClkkSchedules } from './clkkQueries';
 
 const vnd = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -58,8 +58,16 @@ export default function ClkkReport() {
     setBusy(true);
     try {
       const data = await readClkkFile(file, imports[kind].parse);
-      setHcxlDates({});
-      setDraft({ data, kind, name: file.name });
+      let schedules;
+      if (kind === 'hcxl') {
+        schedules = new Map(data.map(({ ma_ch }) => [ma_ch, []]));
+        const rows = await readClkkSchedules([...schedules.keys()]);
+        for (const row of rows) schedules.get(row.ma_ch)?.push(row.ngay_moi);
+        setHcxlDates(Object.fromEntries(
+          [...schedules].filter(([, days]) => days.length === 1).map(([code, [day]]) => [code, day]),
+        ));
+      }
+      setDraft({ data, kind, name: file.name, schedules });
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -177,10 +185,22 @@ export default function ClkkReport() {
     </div>
     {draft && <div>
       <p>{draft.name} · {draft.data.length} {imports[draft.kind].unit}. Các khóa trùng sẽ được cập nhật.</p>
-      {draft.kind === 'hcxl' && <div className="clkk-grid">{draft.data.map(({ ma_ch, dong }) => <label key={ma_ch}>Ngày kiểm kê của {ma_ch} ({dong.length} dòng)
-        <input type="date" required value={hcxlDates[ma_ch] ?? ''}
-          onChange={event => setHcxlDates({ ...hcxlDates, [ma_ch]: event.target.value })}/>
-      </label>)}</div>}
+      {draft.kind === 'hcxl' && <div className="clkk-grid">{draft.data.map(({ ma_ch, dong }) => {
+        const days = draft.schedules.get(ma_ch);
+        return <div key={ma_ch}>
+          {days.length > 1 ? <label>Kỳ kiểm kê của {ma_ch} ({dong.length} dòng)
+            <select required disabled={busy} value={hcxlDates[ma_ch] ?? ''}
+              onChange={event => setHcxlDates({ ...hcxlDates, [ma_ch]: event.target.value })}>
+              <option value="">Chọn kỳ kiểm kê</option>
+              {days.map(day => <option key={day} value={day}>{day.split('-').reverse().join('/')}</option>)}
+            </select>
+          </label> : <p>
+            <strong>{ma_ch}</strong> ({dong.length} dòng) · {days.length === 1
+              ? `Ngày kiểm kê ${days[0].split('-').reverse().join('/')}`
+              : 'Chưa có lịch. Cần nhập lịch kiểm kê của cửa hàng này.'}
+          </p>}
+        </div>;
+      })}</div>}
       <button type="button" disabled={busy || (draft.kind === 'hcxl' && draft.data.some(row => !hcxlDates[row.ma_ch]))} onClick={saveUpload}>Xác nhận nhập</button>{' '}
       <button type="button" disabled={busy} onClick={() => setDraft(null)}>Hủy</button>
     </div>}

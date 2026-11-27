@@ -5,6 +5,10 @@ export const periodKey = row => `${row.ma_ch}|${row.ngay_moi}`;
 export async function readClkkPeriods() {
   const { data: codes, error } = await supabase.rpc('v10_clkk_cua_hang');
   if (error) throw error;
+  return { codes, schedules: await readClkkSchedules(codes) };
+}
+
+export async function readClkkSchedules(codes) {
   const schedules = [];
   for (let offset = 0; ; offset += 500) {
     let query = supabase.from('v10_clkk_lich').select('*').order('ngay_moi', { ascending: false }).order('ma_ch');
@@ -14,7 +18,7 @@ export async function readClkkPeriods() {
     schedules.push(...data);
     if (data.length < 500) break;
   }
-  return { codes, schedules };
+  return schedules;
 }
 
 export async function readClkkGroups(period) {
