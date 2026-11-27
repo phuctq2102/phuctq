@@ -1,15 +1,24 @@
-import { PackageCheck, RefreshCw, LogOut, ListChecks, MapPin, Barcode, ClipboardList, SlidersHorizontal, PlusSquare, FileCheck2, History, Settings, Users, KeyRound } from 'lucide-react';
+import './utilities.css';
+import { Button } from './components/ui/button';
+import { PackageCheck, LogOut, ListChecks, FileCheck2, Users } from 'lucide-react';
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
 import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
 import EmployeeCheck from './EmployeeCheck';
 import FinalView from './FinalView';
-import React,{useEffect,useState,useMemo} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured,fetchAll}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
-const TABLES=[['dscl','Danh sách mã hàng'],['ct_kv','Chi tiết khu vực'],['bc','Barcode bổ sung'],['phan_cong','Phân công'],['dieu_chinh','Điều chỉnh'],['dem_them','Đếm thêm'],['final_lines','Final'],['audit_log','Lịch sử'],['cau_hinh','Cấu hình'],['users','Tài khoản'],['password_manager','Mật khẩu']];
-const NAV_ICONS={dscl:ListChecks,ct_kv:MapPin,bc:Barcode,phan_cong:ClipboardList,dieu_chinh:SlidersHorizontal,dem_them:PlusSquare,final_lines:FileCheck2,audit_log:History,cau_hinh:Settings,users:Users,password_manager:KeyRound};
+import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
+const PAGES=[
+ { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
+ { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
+ { id:'account', label:'Tài khoản & mật khẩu', Icon:Users },
+];
+const IMPORT_TABLES=[
+ ['dscl','Danh sách mã hàng (DSCL)'],
+ ['ct_kv','Chi tiết khu vực (CT_KV)'],
+ ['bc','Barcode bổ sung (BC)'],
+];
 function Brand(){return <div className="v10-brand"><span className="v10-mark"><PackageCheck aria-hidden="true" size={23}/></span><span>Kiểm Kê <b>V10</b></span></div>}
-const HEADERS={dscl:['ma_sp','ten_sp','nganh_hang','nhom_vat_tu','dvt_co_ban','sl_so','sl_dem','gt_chenh_lech'],ct_kv:['ma_sp','barcode','ten_sp','khu_vuc','dvt_nhap','sl_nhap','sl_dem','sl_so'],bc:['ma_sp','barcode','ten_sp','khu_vuc','dvt_co_ban','sl_dem'],phan_cong:['ma_sp','mnv','trang_thai','ngay_kiem'],dieu_chinh:['ma_sp','loai_dieu_chinh','khu_vuc_cu','khu_vuc_moi','sl_cu','sl_moi','mnv','trang_thai_duyet'],dem_them:['ma_sp','barcode','khu_vuc','sl_quy_doi','mnv','trang_thai_duyet'],final_lines:['ma_sp','barcode','ten_sp','khu_vuc','sl_so','sl_dem','chenh_lech','gt_chenh_lech','mnv','trang_thai']};
 const labels={ma_sp:'Mã SP',ten_sp:'Tên sản phẩm',nganh_hang:'Ngành hàng',nhom_vat_tu:'Nhóm vật tư',dvt_co_ban:'ĐVT cơ bản',sl_so:'SL sổ',gt_chenh_lech:'GT chênh lệch',barcode:'Barcode',khu_vuc:'Khu vực',sl_dem:'SL đếm',sl_nhap:'SL nhập',dvt_nhap:'ĐVT nhập',mnv:'MNV',trang_thai:'Trạng thái'};
 
 function PasswordManager({profile,onMessage}){
@@ -42,7 +51,7 @@ function PasswordManager({profile,onMessage}){
  return <section className="panel"><h2>Quản lý mật khẩu</h2><form onSubmit={changeOwn}><h3>Đổi mật khẩu của tôi</h3><label>Mật khẩu mới (ít nhất 12 ký tự)<input type="password" autoComplete="new-password" value={ownPass} onChange={e=>setOwnPass(e.target.value)}/></label><button disabled={working}>Đổi mật khẩu của tôi</button></form>{isAdmin&&<><hr/><h3>Đặt lại mật khẩu nhân viên</h3><p>Không gửi email, không xóa dữ liệu. Chỉ tài khoản ADMIN được thực hiện.</p><label>Mã nhân viên (001–099)<input value={target} maxLength={3} onChange={e=>setTarget(e.target.value)}/></label><label>Mật khẩu mới (ít nhất 12 ký tự)<input type="password" autoComplete="new-password" value={newPass} onChange={e=>setNewPass(e.target.value)}/></label><button disabled={working} onClick={()=>resetEmployees(false)}>Đặt lại 1 nhân viên</button><hr/><h3>Đặt lại toàn bộ 001–099</h3><p>Mỗi tài khoản sẽ có một mật khẩu ngẫu nhiên riêng. Chỉ thực hiện khi bạn đã sẵn sàng cấp lại mật khẩu cho toàn bộ nhân viên.</p><label><input type="checkbox" checked={confirmBatch} onChange={e=>setConfirmBatch(e.target.checked)}/> Tôi xác nhận đặt lại mật khẩu của 99 nhân viên</label><button disabled={working||!confirmBatch} onClick={()=>resetEmployees(true)}>Đặt lại 99 nhân viên</button>{results&&<p><button onClick={downloadResults}>Tải CSV mật khẩu mới (chỉ hiển thị một lần)</button></p>}</>}</section>;
 }
 
-function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[rows,setRows]=useState([]),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[query,setQuery]=useState(''),[page,setPage]=useState(0),[detail,setDetail]=useState(null),[edit,setEdit]=useState({}),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
+function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[inventoryRevision,setInventoryRevision]=useState(0),[importTable,setImportTable]=useState('dscl'),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
 useEffect(()=>{
  if(!supabase)return;
  let active=true;
@@ -65,10 +74,8 @@ useEffect(()=>{
  return()=>{active=false;subscription.unsubscribe()};
 },[]);
 useEffect(()=>{if(!session){setProfile(null);return;}supabase.from('users').select('*').eq('id',session.user.id).maybeSingle().then(({data,error})=>{setProfile(data);if(error)setMessage(error.message)})},[session]);
-async function load(){if(!session||!profile||['dscl','password_manager'].includes(tab))return;setBusy(true);setMessage('');setPage(0);try{let filters=(!admin&&tab==='phan_cong')?[['mnv',profile.mnv]]:(!admin&&tab==='users')?[['id',session.user.id]]:[];let result=await fetchAll(tab,filters);setRows(result)}catch(e){setRows([]);setMessage('Không đọc được dữ liệu: '+e.message)}finally{setBusy(false)}}
-useEffect(()=>{if(session&&profile)load()},[tab,profile?.id]);
-async function chooseFile(e){const file=e.target.files?.[0];e.target.value='';if(!file)return;setUploadBusy(true);setMessage('');try{const parsed=await parseExcel(file,tab);setUpload(parsed)}catch(err){setUpload(null);setMessage('Không đọc được Excel: '+err.message)}finally{setUploadBusy(false)}}
-async function commitUpload(){if(!upload||!admin)return;setUploadBusy(true);setMessage('');try{const result=await replaceTable(supabase,tab,upload.rows,(n,total)=>setMessage(`Đang xử lý thay thế ${n}/${total} dòng...`));setMessage(`Đã thay thế ${result} dòng của ${tab}.`);setUpload(null);await load()}catch(err){setMessage('Thay thế thất bại: '+err.message+'')}finally{setUploadBusy(false)}}
+async function chooseFile(e){const file=e.target.files?.[0];e.target.value='';if(!file)return;setUploadBusy(true);setMessage('');try{const parsed=await parseExcel(file,importTable);setUpload(parsed)}catch(err){setUpload(null);setMessage('Không đọc được Excel: '+err.message)}finally{setUploadBusy(false)}}
+async function commitUpload(){if(!upload||!admin)return;setUploadBusy(true);setMessage('');try{const result=await replaceTable(supabase,importTable,upload.rows,(n,total)=>setMessage(`Đang xử lý thay thế ${n}/${total} dòng...`));setMessage(`Đã thay thế ${result} dòng của ${importTable}.`);setUpload(null);setInventoryRevision(value=>value+1)}catch(err){setMessage('Thay thế thất bại: '+err.message+'')}finally{setUploadBusy(false)}}
 async function signIn(e){
  e.preventDefault();setBusy(true);setMessage('');
  try{
@@ -98,11 +105,72 @@ async function updateRecoveryPassword(e){
   setMessage('Đổi mật khẩu thành công. Hãy đăng nhập bằng mật khẩu mới.');
  }catch(error){setMessage('Không đổi được mật khẩu: '+error.message)}finally{setBusy(false)}
 }
-const visible=useMemo(()=>rows.filter(r=>!query||Object.values(r).some(v=>String(v??'').toLowerCase().includes(query.toLowerCase()))),[rows,query]);const headers=HEADERS[tab]||Object.keys(rows[0]||{}).filter(x=>x!=='du_lieu_goc');const paged=visible.slice(page*50,(page+1)*50);
-function openRow(r){setDetail(r);setEdit({khu_vuc_moi:r.khu_vuc||'',sl_moi:r.sl_dem??0,ghi_chu:''})}
-async function saveCorrection(){if(!detail||!profile)return;setBusy(true);setMessage('');try{if(!['ct_kv','bc'].includes(tab))throw Error('Chỉ hỗ trợ tạo đề xuất điều chỉnh từ CT_KV hoặc BC');const payload={ma_sp:detail.ma_sp,ct_kv_id:tab==='ct_kv'?detail.id:null,loai_dieu_chinh:'SUA_SO_LUONG',khu_vuc_cu:detail.khu_vuc||null,khu_vuc_moi:edit.khu_vuc_moi||null,sl_cu:Number(detail.sl_dem||0),sl_moi:Number(edit.sl_moi),sl_chenh_lech:Number(edit.sl_moi)-Number(detail.sl_dem||0),mnv:profile.mnv,nguoi_cap_nhat:profile.mnv,ghi_chu:edit.ghi_chu||null,trang_thai_duyet:'Không cần duyệt'};if(!Number.isFinite(payload.sl_moi))throw Error('Số lượng không hợp lệ');const {error}=await supabase.from('dieu_chinh').insert(payload);if(error)throw error;setMessage('Đã gửi yêu cầu điều chỉnh. Chỉ có hiệu lực khi quy trình duyệt được triển khai.');setDetail(null)}catch(e){setMessage('Không lưu được: '+e.message)}finally{setBusy(false)}}
 if(!configured)return <div className="center"><div className="panel"><h2>Chưa cấu hình Supabase</h2><p>Tạo file <code>.env.local</code> theo <code>.env.example</code> rồi chạy lại ứng dụng.</p></div></div>;
 if(recoveryMode)return <div className="center"><form className="panel login" onSubmit={updateRecoveryPassword}><Brand/><h2>Đặt lại mật khẩu</h2><p>{recoveryReady&&session?'Liên kết đã được xác thực. Vui lòng nhập mật khẩu mới.':'Đang xác thực liên kết khôi phục. Nếu không tiếp tục được, hãy yêu cầu email mới.'}</p><label>Mật khẩu mới<input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label><label>Xác nhận mật khẩu<input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required/></label><button disabled={busy||!recoveryReady||!session}>{busy?'Đang cập nhật...':'Đổi mật khẩu'}</button>{message&&<p className="error">{message}</p>}</form></div>;
-if(!session)return <div className="center"><form className="panel login" onSubmit={signIn}><Brand/><div className="login-title"><h1>Đăng nhập</h1><p>Nhập mã nhân viên để vào hệ thống kiểm kê.</p></div><label>Mã nhân viên<input type="text" autoComplete="username" maxLength={5} placeholder="ADMIN hoặc 001" value={mnv} onChange={e=>setMnv(e.target.value)} required/></label><label>Mật khẩu<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label><button disabled={busy}>{busy?'Đang đăng nhập…':'Đăng nhập'}</button>{message&&<p className="error">{message}</p>}</form></div>;
-return <div className="layout"><aside><Brand/><nav aria-label="Phân hệ kiểm kê">{TABLES.filter(([t])=>admin||['dscl','phan_cong','dieu_chinh','dem_them','password_manager'].includes(t)).map(([t,name])=>{const Icon=NAV_ICONS[t];return <button aria-current={tab===t?'page':undefined} className={tab===t?'active':''} key={t} onClick={()=>{setTab(t);setQuery('');setDetail(null);setUpload(null)}}><Icon size={17} aria-hidden="true"/>{name}</button>})}</nav><div className="asidefoot"><small>{profile?.ho_ten||profile?.mnv||'Tài khoản'}</small><small>{profile?.vai_tro||'Chưa được cấp vai trò'}</small><button onClick={()=>supabase.auth.signOut()}><LogOut size={16} aria-hidden="true"/>Đăng xuất</button></div></aside><main><header><div><h1>{TABLES.find(x=>x[0]===tab)?.[1]}</h1><p>{admin?'Quản trị viên':'Nhân viên'}</p></div><button className="outline" disabled={busy} onClick={load}><RefreshCw size={16} aria-hidden="true"/> Tải lại</button></header>{!profile&&<div className="warning">Tài khoản Auth chưa có hồ sơ trong public.users. Liên hệ Admin để liên kết UUID.</div>}{!admin&&tab==='dieu_chinh'&&<div className="warning">Chỉ xem các dòng mà chính sách RLS cho phép. Quyền ghi và quy trình duyệt cần cấu hình riêng.</div>}{admin&&['dscl','ct_kv','bc'].includes(tab)&&<section className="panel importpanel"><details><summary>Nhập Excel {tab.toUpperCase()} (mở khi cần cập nhật dữ liệu)</summary><div className="importpanel-inner"><h3>Nhập Excel {tab.toUpperCase()}</h3><p>Upload sẽ thay thế toàn bộ dữ liệu cũ của bảng này sau khi tải và kiểm tra thành công. Bảng khác không bị xóa trực tiếp.</p><input type="file" accept=".xlsx,.xls" disabled={uploadBusy} onChange={chooseFile}/>{upload?.table===tab&&<><p><b>{upload.rows.length.toLocaleString('vi-VN')} dòng</b> hợp lệ · Sheet: {upload.sheet}</p><p>Cột nhận diện: {upload.columns.join(', ')}</p><div className="tablewrap"><table><thead><tr>{upload.columns.map(c=><th key={c}>{labels[c]||c}</th>)}</tr></thead><tbody>{upload.rows.slice(0,5).map((r,i)=><tr key={i}>{upload.columns.map(c=><td key={c}>{String(r[c]??'')}</td>)}</tr>)}</tbody></table></div><button disabled={uploadBusy} onClick={commitUpload}>Xác nhận thay thế toàn bộ dữ liệu cũ</button> <button className="outline" disabled={uploadBusy} onClick={()=>setUpload(null)}>Hủy</button></>}{uploadBusy&&<p>Đang xử lý, vui lòng chờ...</p>}</div></details></section>}{admin&&tab==='dscl'&&<PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setRows([]);setUpload(null)}}/>}{message&&<div className="notice" role="status">{message}</div>}{tab==='dscl'&&admin&&<AssignmentTools onMessage={setMessage}/>} {tab==='password_manager'?<PasswordManager profile={profile} onMessage={setMessage}/>:tab==='final_lines'&&admin?<FinalView/>:tab==='users'&&admin?<Accounts/>:tab==='phan_cong'&&!admin?<EmployeeCheck profile={profile} onMessage={setMessage}/>:tab==='dscl'?<InventoryList admin={admin} profile={profile} onMessage={setMessage}/>:<section className="panel"><div className="toolbar"><input placeholder="Tìm trong dữ liệu đã tải..." value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}/><span>{visible.length.toLocaleString('vi-VN')} dòng</span></div><div className="tablewrap"><table><thead><tr>{headers.map(h=><th key={h}>{labels[h]||h}</th>)}<th>Chi tiết</th></tr></thead><tbody>{paged.map((r,i)=><tr key={r.id||i}>{headers.map(h=><td key={h}>{typeof r[h]==='object'?JSON.stringify(r[h]):String(r[h]??'')}</td>)}<td><button className="small" onClick={()=>openRow(r)}>Xem</button></td></tr>)}</tbody></table>{!busy&&!visible.length&&<p className="empty">Chưa có dữ liệu hoặc không có quyền xem.</p>}{busy&&<p className="empty">Đang tải dữ liệu...</p>}</div><div className="pager"><button className="outline" disabled={page===0} onClick={()=>setPage(p=>p-1)}>Trước</button><span>Trang {page+1}/{Math.max(1,Math.ceil(visible.length/50))}</span><button className="outline" disabled={(page+1)*50>=visible.length} onClick={()=>setPage(p=>p+1)}>Sau</button></div></section>}{detail&&<div className="overlay" onClick={()=>setDetail(null)}><div className="panel modal" onClick={e=>e.stopPropagation()}><div className="modalhead"><h2>Chi tiết {detail.ma_sp||detail.id}</h2><button className="outline" onClick={()=>setDetail(null)}>Đóng</button></div><div className="fields">{Object.entries(detail).filter(([k])=>k!=='du_lieu_goc').map(([k,v])=><div key={k}><b>{labels[k]||k}</b><span>{typeof v==='object'?JSON.stringify(v):String(v??'')}</span></div>)}</div>{['ct_kv','bc'].includes(tab)&&<div className="editbox"><h3>Gửi đề xuất điều chỉnh</h3><p>Không sửa trực tiếp dữ liệu gốc.</p><label>Khu vực mới<input value={edit.khu_vuc_moi} onChange={e=>setEdit({...edit,khu_vuc_moi:e.target.value})}/></label><label>Số lượng mới<input type="number" value={edit.sl_moi} onChange={e=>setEdit({...edit,sl_moi:e.target.value})}/></label><label>Ghi chú<input value={edit.ghi_chu} onChange={e=>setEdit({...edit,ghi_chu:e.target.value})}/></label><button disabled={busy} onClick={saveCorrection}>Gửi yêu cầu</button></div>}</div></div>}</main></div>}
+if(!session)return <div className="center"><form className="panel login" onSubmit={signIn}><Brand/><div className="login-title"><h1>Đăng nhập</h1><p>Nhập mã nhân viên để vào hệ thống kiểm kê.</p></div><label>Mã nhân viên<input type="text" autoComplete="username" maxLength={5} placeholder="ADMIN hoặc 001" value={mnv} onChange={e=>setMnv(e.target.value)} required/></label><label>Mật khẩu<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label><Button type="submit" disabled={busy}>{busy?'Đang đăng nhập…':'Đăng nhập'}</Button>{message&&<p className="error">{message}</p>}</form></div>;
+const pages=PAGES.filter(page=>admin||!page.adminOnly);
+const currentPage=pages.find(page=>page.id===tab)||pages[0];
+return (
+ <div className="layout">
+  <aside>
+   <Brand/>
+   <nav aria-label="Phân hệ kiểm kê">
+    {pages.map(({id,label,Icon})=>(
+     <button type="button" key={id} aria-current={currentPage.id===id?'page':undefined}
+      className={currentPage.id===id?'active':''} onClick={()=>{setTab(id);setMessage('')}}>
+      <Icon size={17} aria-hidden="true"/>{label}
+     </button>
+    ))}
+   </nav>
+   <div className="asidefoot">
+    <small>{profile?.ho_ten||profile?.mnv||'Tài khoản'}</small>
+    <small>{profile?.vai_tro||'Chưa được cấp vai trò'}</small>
+    <button type="button" onClick={()=>supabase.auth.signOut()}><LogOut size={16} aria-hidden="true"/>Đăng xuất</button>
+   </div>
+  </aside>
+  <main>
+   <header><h1>{currentPage.label}</h1></header>
+   {!profile&&<div className="warning">Tài khoản chưa có hồ sơ nhân viên. Liên hệ quản trị viên để được hỗ trợ.</div>}
+   {message&&<div className="notice" role="status">{message}</div>}
+   {currentPage.id==='dscl'&&<>
+    <InventoryList key={inventoryRevision} admin={admin} profile={profile} onMessage={setMessage}/>
+    {admin&&<details className="panel inventory-tools">
+     <summary>Nhập dữ liệu và quản lý kỳ kiểm kê</summary>
+     <div className="inventory-tools-content">
+      <section className="importpanel-inner">
+       <h2>Nhập Excel</h2>
+       <label>Loại dữ liệu <select value={importTable} disabled={uploadBusy} onChange={e=>{setImportTable(e.target.value);setUpload(null)}}>
+        {IMPORT_TABLES.map(([id,label])=><option key={id} value={id}>{label}</option>)}
+       </select></label>
+       <p>Dữ liệu cũ của bảng đã chọn sẽ được thay thế khi nhập thành công.</p>
+       <input type="file" aria-label="Chọn tệp Excel" accept=".xlsx,.xls" disabled={uploadBusy} onChange={chooseFile}/>
+       {upload?.table===importTable&&<>
+        <p><b>{upload.rows.length.toLocaleString('vi-VN')} dòng</b> hợp lệ · Sheet {upload.sheet}</p>
+        <div className="tablewrap"><table>
+         <thead><tr>{upload.columns.map(column=><th key={column}>{labels[column]||column}</th>)}</tr></thead>
+         <tbody>{upload.rows.slice(0,5).map((row,index)=><tr key={index}>{upload.columns.map(column=><td key={column}>{String(row[column]??'')}</td>)}</tr>)}</tbody>
+        </table></div>
+        <div><Button type="button" disabled={uploadBusy} onClick={commitUpload}>Xác nhận thay thế dữ liệu</Button>{' '}
+         <Button type="button" variant="outline" disabled={uploadBusy} onClick={()=>setUpload(null)}>Hủy</Button></div>
+       </>}
+       {uploadBusy&&<p role="status">Đang xử lý…</p>}
+      </section>
+      <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setUpload(null)}}/>
+      <AssignmentTools onMessage={setMessage}/>
+     </div>
+    </details>}
+    {!admin&&profile&&<details className="panel inventory-tools">
+     <summary>Kiểm mã được giao và quét barcode</summary>
+     <div className="inventory-tools-content"><EmployeeCheck profile={profile} onMessage={setMessage}/></div>
+    </details>}
+   </>}
+   {currentPage.id==='final_lines'&&<FinalView/>}
+   {currentPage.id==='account'&&<div className="account-page">
+    {admin&&<Accounts/>}
+    <PasswordManager profile={profile} onMessage={setMessage}/>
+   </div>}
+  </main>
+ </div>
+);
+}
 createRoot(document.getElementById('root')).render(<App/>);
