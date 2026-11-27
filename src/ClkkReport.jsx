@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import { parseHcxl, parseSap, parseSchedule, parseStaff, readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
 import './clkkReport.css';
+import Bm8Notes from './Bm8Notes';
 import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
 
 const vnd = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
@@ -166,6 +167,7 @@ export default function ClkkReport() {
 
   return <section className="panel clkk">
     <h2>Báo cáo CLKK và Biên bản</h2>
+    <Bm8Notes/>
     {message && <p role="status">{message}</p>}
     <div className="clkk-grid">
       {Object.entries(imports).map(([kind, config]) => <label key={kind}>{config.label}
