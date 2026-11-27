@@ -9,11 +9,13 @@ import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
 import EmployeeCheck from './EmployeeCheck';
 import FinalView from './FinalView';
+import ClkkReport from './ClkkReport';
 import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
  { id:'dashboard', label:'Dashboard', Icon:LayoutDashboard, adminOnly:true },
  { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
+ { id:'clkk', label:'Báo cáo CLKK và Biên bản', Icon:FileCheck2, adminOnly:true },
  { id:'phan_cong', label:'Phân công', Icon:ClipboardList, employeeOnly:true },
  { id:'account', label:'Tài khoản & mật khẩu', Icon:Users },
 ];
@@ -171,7 +173,11 @@ return (
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
    {currentPage.id==='dashboard'&&<Dashboard/>}
-   {currentPage.id==='final_lines'&&<FinalView/>}
+   {currentPage.id==='final_lines'&&<>
+    <Button type="button" variant="outline" onClick={()=>setTab('clkk')}>Mở báo cáo CLKK của kỳ</Button>
+    <FinalView/>
+   </>}
+   {currentPage.id==='clkk'&&<ClkkReport/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}
     <PasswordManager profile={profile} onMessage={setMessage}/>
