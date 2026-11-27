@@ -55,7 +55,7 @@ function PasswordManager({profile,onMessage}){
  return <section className="panel"><h2>Quản lý mật khẩu</h2><form onSubmit={changeOwn}><h3>Đổi mật khẩu của tôi</h3><label>Mật khẩu mới (ít nhất 12 ký tự)<input type="password" autoComplete="new-password" value={ownPass} onChange={e=>setOwnPass(e.target.value)}/></label><button disabled={working}>Đổi mật khẩu của tôi</button></form>{isAdmin&&<><hr/><h3>Đặt lại mật khẩu nhân viên</h3><p>Không gửi email, không xóa dữ liệu. Chỉ tài khoản ADMIN được thực hiện.</p><label>Mã nhân viên (001–099)<input value={target} maxLength={3} onChange={e=>setTarget(e.target.value)}/></label><label>Mật khẩu mới (ít nhất 12 ký tự)<input type="password" autoComplete="new-password" value={newPass} onChange={e=>setNewPass(e.target.value)}/></label><button disabled={working} onClick={()=>resetEmployees(false)}>Đặt lại 1 nhân viên</button><hr/><h3>Đặt lại toàn bộ 001–099</h3><p>Mỗi tài khoản sẽ có một mật khẩu ngẫu nhiên riêng. Chỉ thực hiện khi bạn đã sẵn sàng cấp lại mật khẩu cho toàn bộ nhân viên.</p><label><input type="checkbox" checked={confirmBatch} onChange={e=>setConfirmBatch(e.target.checked)}/> Tôi xác nhận đặt lại mật khẩu của 99 nhân viên</label><button disabled={working||!confirmBatch} onClick={()=>resetEmployees(true)}>Đặt lại 99 nhân viên</button>{results&&<p><button onClick={downloadResults}>Tải CSV mật khẩu mới (chỉ hiển thị một lần)</button></p>}</>}</section>;
 }
 
-function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[inventoryRevision,setInventoryRevision]=useState(0),[importTable,setImportTable]=useState('dscl'),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
+function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[inventoryRevision,setInventoryRevision]=useState(0),[importTable,setImportTable]=useState('dscl'),[openCtKvImport,setOpenCtKvImport]=useState(false),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
 useEffect(()=>{
  if(!supabase)return;
  let active=true;
@@ -78,6 +78,9 @@ useEffect(()=>{
  return()=>{active=false;subscription.unsubscribe()};
 },[]);
 useEffect(()=>{if(!session){setProfile(null);return;}supabase.from('users').select('*').eq('id',session.user.id).maybeSingle().then(({data,error})=>{setProfile(data);if(error)setMessage(error.message)})},[session]);
+useEffect(()=>{
+ if(tab==='dscl'&&openCtKvImport)document.getElementById('v10-inventory-import')?.scrollIntoView({block:'start'});
+},[tab,openCtKvImport]);
 async function chooseFile(e){const file=e.target.files?.[0];e.target.value='';if(!file)return;setUploadBusy(true);setMessage('');try{const parsed=await parseExcel(file,importTable);setUpload(parsed)}catch(err){setUpload(null);setMessage('Không đọc được Excel: '+err.message)}finally{setUploadBusy(false)}}
 async function commitUpload(){if(!upload||!admin)return;setUploadBusy(true);setMessage('');try{const result=await replaceTable(supabase,importTable,upload.rows,(n,total)=>setMessage(`Đang xử lý thay thế ${n}/${total} dòng...`));setMessage(`Đã thay thế ${result} dòng của ${importTable}.`);setUpload(null);setInventoryRevision(value=>value+1)}catch(err){setMessage('Thay thế thất bại: '+err.message+'')}finally{setUploadBusy(false)}}
 async function signIn(e){
@@ -142,7 +145,7 @@ return (
    {message&&<div className="notice" role="status">{message}</div>}
    {currentPage.id==='dscl'&&<>
     <InventoryList key={inventoryRevision} admin={admin} profile={profile} onMessage={setMessage}/>
-    {admin&&<details className="panel inventory-tools">
+    {admin&&<details id="v10-inventory-import" className="panel inventory-tools" open={openCtKvImport||undefined} onToggle={event=>{if(!event.currentTarget.open)setOpenCtKvImport(false)}}>
      <summary>Nhập dữ liệu và quản lý kỳ kiểm kê</summary>
      <div className="inventory-tools-content">
       <section className="importpanel-inner">
@@ -170,7 +173,12 @@ return (
     </details>}
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
-   {currentPage.id==='dashboard'&&<Dashboard/>}
+   {currentPage.id==='dashboard'&&<Dashboard onOpenCtKvImport={()=>{
+    setImportTable('ct_kv');
+    setUpload(null);
+    setOpenCtKvImport(true);
+    setTab('dscl');
+   }}/>}
    {currentPage.id==='final_lines'&&<FinalView/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}

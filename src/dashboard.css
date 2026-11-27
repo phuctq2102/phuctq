@@ -42,3 +42,6 @@
 @media (max-width: 900px) {
   .dashboard-mch2-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.dashboard-scroll .dashboard-round { min-width: 175px; white-space: normal; vertical-align: top; }
+.dashboard-round small { margin-top: 3px; }
+.dashboard-round-notice { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 0; }

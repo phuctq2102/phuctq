@@ -62,20 +62,19 @@ export function summarizeZones(rows) {
   for (const row of rows) {
     const zone = text(row.khu_vuc);
     if (!zones.has(zone)) zones.set(zone, {
-      zone, lines: 0, products: new Set(), updaters: new Set(),
-      rounds: [{ count: 0, first: Infinity, last: -Infinity }, { count: 0, first: Infinity, last: -Infinity }],
+      zone, lines: 0, products: new Set(),
+      rounds: [1, 2].map(() => ({ count: 0, first: Infinity, last: -Infinity, updaters: new Set() })),
     });
     const summary = zones.get(zone);
     summary.lines += 1;
     const source = row.du_lieu_goc;
-    for (const updater of [source?.nguoi_cap_nhat, source?.nguoi_cap_nhat_round2].map(text)) {
-      if (updater) summary.updaters.add(updater);
-    }
     for (const [index, key] of ['round1_at', 'round2_at'].entries()) {
+      const round = summary.rounds[index];
+      const updater = text(index === 0 ? source?.nguoi_cap_nhat : source?.nguoi_cap_nhat_round2);
+      if (updater) round.updaters.add(updater);
       const raw = source?.[key];
       const timestamp = typeof raw === 'string' ? Date.parse(raw) : NaN;
       if (!Number.isFinite(timestamp)) continue;
-      const round = summary.rounds[index];
       round.count += 1;
       round.first = Math.min(round.first, timestamp);
       round.last = Math.max(round.last, timestamp);
