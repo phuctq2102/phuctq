@@ -1,8 +1,9 @@
 import './utilities.css';
 import { Button } from './components/ui/button';
-import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, Users } from 'lucide-react';
+import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, LayoutDashboard, Users } from 'lucide-react';
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
+import Dashboard from './Dashboard';
 import IndustryImport from './IndustryImport';
 import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
@@ -11,6 +12,7 @@ import FinalView from './FinalView';
 import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
+ { id:'dashboard', label:'Dashboard', Icon:LayoutDashboard, adminOnly:true },
  { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
  { id:'phan_cong', label:'Phân công', Icon:ClipboardList, employeeOnly:true },
  { id:'account', label:'Tài khoản & mật khẩu', Icon:Users },
@@ -168,6 +170,7 @@ return (
     </details>}
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
+   {currentPage.id==='dashboard'&&<Dashboard/>}
    {currentPage.id==='final_lines'&&<FinalView/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}
