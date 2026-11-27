@@ -3,6 +3,7 @@ import { Button } from './components/ui/button';
 import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, Users } from 'lucide-react';
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
+import IndustryImport from './IndustryImport';
 import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
 import EmployeeCheck from './EmployeeCheck';
@@ -160,6 +161,7 @@ return (
        </>}
        {uploadBusy&&<p role="status">Đang xử lý…</p>}
       </section>
+      <IndustryImport onSaved={()=>setInventoryRevision(value=>value+1)}/>
       <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setUpload(null)}}/>
       <AssignmentTools onMessage={setMessage}/>
      </div>
