@@ -30,3 +30,9 @@
 .dashboard-quantities > div { padding: 6px 8px; background: var(--tint); border-radius: 6px; min-width: 0; }
 .dashboard-quantities dt { font-size: .8125rem; color: var(--muted); }
 .dashboard-quantities dd { margin: 3px 0 0; font-weight: 650; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.dashboard-mch2-list { display: grid; gap: 16px; }
+.dashboard-mch2-group { display: grid; min-width: 0; gap: 8px; }
+.dashboard-mch2-group + .dashboard-mch2-group { border-top: 1px solid var(--line); padding-top: 16px; }
+.dashboard-mch2-group h3 { margin: 0; font-size: 1rem; display: flex; align-items: baseline; gap: 8px; }
+.dashboard-mch2-group h3 span { color: var(--muted); font-size: .875rem; font-weight: 500; }
+.dashboard-mch2-group .inv-kpis > div { background: var(--tint); }

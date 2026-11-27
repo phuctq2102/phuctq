@@ -20,6 +20,22 @@ async function readPages(table, fields, key = 'id') {
   }
 }
 
+function DiscrepancyMetrics({ summary }) {
+  const net = summary.net ?? summary.positive + summary.negative;
+  const metrics = [
+    ['Mã sản phẩm', integer.format(summary.productCount), ''],
+    ['Tổng lệch âm', money(summary.negative), 'negative'],
+    ['Tổng lệch dương', money(summary.positive), 'positive'],
+    ['Chênh lệch ròng', money(net), net < 0 ? 'negative' : net > 0 ? 'positive' : ''],
+  ];
+
+  return <div className="inv-kpis dashboard-kpis">
+    {metrics.map(([label, value, tone]) => (
+      <div key={label}><small>{label}</small><strong className={tone}>{value}</strong></div>
+    ))}
+  </div>;
+}
+
 function ProductRanking({ title, rows, direction }) {
   const Icon = direction === 'negative' ? ArrowDownRight : ArrowUpRight;
   return <section className="panel dashboard-panel">
@@ -72,12 +88,7 @@ export default function Dashboard() {
   }, [snapshot, overview, industry]);
 
   const chartScale = Math.max(1, ...summary?.industries.flatMap(row => [row.positive, -row.negative]) ?? []);
-  const metrics = summary && [
-    ['Mã sản phẩm', integer.format(summary.productCount), ''],
-    ['Tổng lệch âm', money(summary.negative), 'negative'],
-    ['Tổng lệch dương', money(summary.positive), 'positive'],
-    ['Chênh lệch ròng', money(summary.positive + summary.negative), summary.positive + summary.negative < 0 ? 'negative' : ''],
-  ];
+
 
   return <div className="dashboard-view" aria-busy={busy}>
     <div className="dashboard-toolbar">
@@ -95,20 +106,15 @@ export default function Dashboard() {
     {busy && <p role="status">Đang tải dữ liệu kiểm kê…</p>}
     {error && <p className="warning" role="alert">Không tải được dữ liệu mới. {error}</p>}
     {summary && <>
-      <div className="inv-kpis dashboard-kpis">
-        {metrics.map(([label, value, tone]) => <div key={label}><small>{label}</small><strong className={tone}>{value}</strong></div>)}
-      </div>
+      <DiscrepancyMetrics summary={summary}/>
       <section className="panel dashboard-panel">
         <h2>Chênh lệch ròng (netoff) theo MCH2</h2>
         <p className="dashboard-caption">Tổng lệch âm cộng tổng lệch dương của các mã thuộc từng ngành, trên toàn bộ DSCL.</p>
-        <div className="tablewrap dashboard-scroll">
-          <table>
-            <thead><tr><th scope="col">Ngành hàng MCH2</th><th scope="col">Chênh lệch ròng</th></tr></thead>
-            <tbody>{overview.parents.map(row => <tr key={row.code}>
-              <th scope="row">{row.name}<small>{row.code}</small></th>
-              <td className={row.net < 0 ? 'negative' : row.net > 0 ? 'positive' : ''}>{money(row.net)}</td>
-            </tr>)}</tbody>
-          </table>
+        <div className="dashboard-mch2-list">
+          {overview.parents.map(row => <section key={row.code} className="dashboard-mch2-group">
+            <h3>{row.name}{row.code && <span>{row.code}</span>}</h3>
+            <DiscrepancyMetrics summary={row}/>
+          </section>)}
         </div>
         {!overview.parents.length && <p className="empty">Không có dữ liệu DSCL.</p>}
       </section>
