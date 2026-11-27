@@ -3,7 +3,7 @@ import { parseCountTimestamp } from './countRoundTime';
 
 const fields = {
   dscl: ['ma_sp', 'ten_sp', 'nganh_hang', 'nhom_vat_tu', 'dvt_co_ban', 'sl_so', 'sl_dem', 'gt_chenh_lech'],
-  ct_kv: ['ma_sp', 'barcode', 'ten_sp', 'khu_vuc', 'dvt_nhap', 'sl_nhap', 'sl_dem', 'sl_so', 'round1_at', 'round2_at', 'nguoi_cap_nhat'],
+  ct_kv: ['ma_sp', 'barcode', 'ten_sp', 'khu_vuc', 'dvt_nhap', 'sl_nhap', 'sl_dem', 'sl_so', 'round1_at', 'round2_at', 'nguoi_cap_nhat', 'nguoi_cap_nhat_round2'],
   bc: ['ma_sp', 'barcode', 'ten_sp', 'khu_vuc', 'dvt_co_ban', 'sl_dem'],
 };
 
@@ -15,9 +15,10 @@ const aliases = {
   dvt_co_ban: ['dvt_co_ban', 'dvt co ban', 'don vi do luong co ban', 'don vi do luong cb'],
   sl_so: ['sl_so', 'sl so', 'so luong tren so', 'so luong so', 'sl tren so', 'ton so', 'so luong ton so', 'sl ton', 'so luong ton', 'so luong ton kho'],
   gt_chenh_lech: ['gt_chenh_lech', 'gt chenh lech', 'gia tri chenh lech', 'so tien chenh lech'],
-  round1_at: ['round1_at', 'round 1 ngay cap nhat', 'roud 1 ngay cap nhat', 'ngay cap nhat round 1', 'ngay cap nhat roud 1'],
+  round1_at: ['round1_at', 'ngay cap nhat', 'round 1 ngay cap nhat', 'roud 1 ngay cap nhat', 'ngay cap nhat round 1', 'ngay cap nhat roud 1'],
   round2_at: ['round2_at', 'round 2 ngay cap nhat', 'roud 2 ngay cap nhat', 'ngay cap nhat round 2', 'ngay cap nhat roud 2', 'round 2 ngay cap nhat round 2', 'roud 2 ngay cap nhat round 2'],
   nguoi_cap_nhat: ['nguoi_cap_nhat', 'nguoi cap nhat'],
+  nguoi_cap_nhat_round2: ['nguoi_cap_nhat_round2', 'nguoi cap nhat round 2', 'nguoi cap nhat roud 2'],
   barcode: ['barcode', 'bar code', 'ma vach', 'ean', 'ean upc', 'ma ean', 'ma barcode', 'ma vach san pham'],
   khu_vuc: ['khu_vuc', 'khu vuc', 'vi tri', 'khu vuc kiem dem', 'khu vuc dem'],
   dvt_nhap: ['dvt_nhap', 'don vi nhap', 'dvt nhap', 'don vi tinh nhap', 'dvt quy doi', 'don vi tinh quy doi', 'dvt nhap quy doi'],
@@ -117,10 +118,12 @@ export async function parseExcel(file, table) {
       if (!key || !fields[table].includes(key) || Object.hasOwn(record, key)) return;
 
       const cell = XLSX.utils.encode_cell({ r: index, c: column });
-      const value = key === 'nguoi_cap_nhat' ? worksheet[cell]?.w ?? row[column] : row[column];
+      const value = key.startsWith('nguoi_cap_nhat') ? worksheet[cell]?.w ?? row[column] : row[column];
       if (value === null || value === undefined || String(value).trim() === '') return;
 
       if (key === 'round1_at' || key === 'round2_at') {
+        const formatted = String(worksheet[cell]?.w ?? value).trim();
+        if (value === 0 || /^0{1,2}[/.\-]0?1[/.\-]1900(?:\s+00:00(?::00)?)?$/.test(formatted)) return;
         const timestamp = parseCountTimestamp(value, workbook.Workbook?.WBProps?.date1904);
         if (!timestamp) throw Error(`Dòng Excel ${index + 1}: ${header[column]} không phải ngày giờ hợp lệ.`);
         record[key] = timestamp;

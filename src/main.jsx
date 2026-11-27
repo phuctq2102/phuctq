@@ -23,7 +23,7 @@ const IMPORT_TABLES=[
  ['bc','Barcode bổ sung (BC)'],
 ];
 function Brand(){return <div className="v10-brand"><span className="v10-mark"><PackageCheck aria-hidden="true" size={23}/></span><span>Kiểm Kê <b>V10</b></span></div>}
-const labels={round1_at:'Round 1 · Ngày cập nhật',round2_at:'Round 2 · Ngày cập nhật',nguoi_cap_nhat:'Người cập nhật',ma_sp:'Mã SP',ten_sp:'Tên sản phẩm',nganh_hang:'Ngành hàng',nhom_vat_tu:'Nhóm vật tư',dvt_co_ban:'ĐVT cơ bản',sl_so:'SL sổ',gt_chenh_lech:'GT chênh lệch',barcode:'Barcode',khu_vuc:'Khu vực',sl_dem:'SL đếm',sl_nhap:'SL nhập',dvt_nhap:'ĐVT nhập',mnv:'MNV',trang_thai:'Trạng thái'};
+const labels={round1_at:'Round 1 · Ngày cập nhật',round2_at:'Round 2 · Ngày cập nhật',nguoi_cap_nhat:'Người cập nhật',nguoi_cap_nhat_round2:'Người cập nhật Round 2',ma_sp:'Mã SP',ten_sp:'Tên sản phẩm',nganh_hang:'Ngành hàng',nhom_vat_tu:'Nhóm vật tư',dvt_co_ban:'ĐVT cơ bản',sl_so:'SL sổ',gt_chenh_lech:'GT chênh lệch',barcode:'Barcode',khu_vuc:'Khu vực',sl_dem:'SL đếm',sl_nhap:'SL nhập',dvt_nhap:'ĐVT nhập',mnv:'MNV',trang_thai:'Trạng thái'};
 
 function PasswordManager({profile,onMessage}){
  const [target,setTarget]=useState('001');

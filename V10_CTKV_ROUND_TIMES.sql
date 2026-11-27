@@ -134,7 +134,8 @@ BEGIN
             sl_so numeric,
             round1_at timestamptz,
             round2_at timestamptz,
-            nguoi_cap_nhat text
+            nguoi_cap_nhat text,
+            nguoi_cap_nhat_round2 text
         );
 
     ELSE

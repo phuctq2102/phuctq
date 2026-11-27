@@ -68,8 +68,9 @@ export function summarizeZones(rows) {
     const summary = zones.get(zone);
     summary.lines += 1;
     const source = row.du_lieu_goc;
-    const updater = text(source?.nguoi_cap_nhat);
-    if (updater) summary.updaters.add(updater);
+    for (const updater of [source?.nguoi_cap_nhat, source?.nguoi_cap_nhat_round2].map(text)) {
+      if (updater) summary.updaters.add(updater);
+    }
     for (const [index, key] of ['round1_at', 'round2_at'].entries()) {
       const raw = source?.[key];
       const timestamp = typeof raw === 'string' ? Date.parse(raw) : NaN;
