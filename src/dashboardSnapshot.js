@@ -5,9 +5,10 @@ import dashboard from './dashboard.css?inline';
 export function saveDashboardSnapshot(root, industry, print = false) {
   if (!root) throw new Error('Không tìm thấy Dashboard.');
   const clone = root.cloneNode(true);
-  const label = root.querySelector('select')?.selectedOptions[0]?.textContent || 'Tất cả MCH3';
+  const label = root.querySelector('.dashboard-industry-select')?.selectedOptions[0]?.textContent || 'Tất cả MCH3';
   clone.querySelector('.dashboard-controls')?.remove();
-  clone.querySelectorAll('button, [role="alert"], [role="status"]').forEach(el => el.remove());
+  clone.querySelector('.dashboard-period-picker')?.remove();
+  clone.querySelectorAll('button, [role="status"]').forEach(el => el.remove());
   const meta = document.createElement('p');
   meta.className = 'dashboard-caption';
   meta.textContent = `Ngành hàng: ${label} | Sao lưu: ${new Date().toLocaleString('vi-VN')} | MCH2: toàn bộ DSCL`;

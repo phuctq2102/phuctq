@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 import { parseHcxl, parseSap, parseSchedule, parseStaff, readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
 import './clkkReport.css';
+import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
 
 const vnd = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -30,18 +31,8 @@ export default function ClkkReport() {
   const [email, setEmail] = useState('');
 
   async function loadPeriods() {
-    const { data: codes, error } = await supabase.rpc('v10_clkk_cua_hang');
-    if (error) throw error;
+    const { codes, schedules } = await readClkkPeriods();
     setStores(codes);
-    const schedules = [];
-    for (let offset = 0; ; offset += 500) {
-      let query = supabase.from('v10_clkk_lich').select('*').order('ngay_moi', { ascending: false }).order('ma_ch');
-      if (codes.length) query = query.in('ma_ch', codes);
-      const { data, error: scheduleError } = await query.range(offset, offset + 499);
-      if (scheduleError) throw scheduleError;
-      schedules.push(...data);
-      if (data.length < 500) break;
-    }
     setPeriods(schedules);
     setSelected(codes.length === 1 && schedules.length === 1 ? periodKey(schedules[0]) : '');
   }
@@ -50,7 +41,6 @@ export default function ClkkReport() {
     loadPeriods().catch(error => setMessage(error.message)).finally(() => setBusy(false));
   }, []);
 
-  const periodKey = row => `${row.ma_ch}|${row.ngay_moi}`;
   const period = periods.find(row => periodKey(row) === selected);
   const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
 
@@ -101,14 +91,7 @@ export default function ClkkReport() {
     setBusy(true);
     setMessage('');
     try {
-      const rows = [];
-      for (let offset = 0; ; offset += 500) {
-        const { data, error } = await supabase.rpc('v10_clkk_mch3', { p_ma_ch: period.ma_ch, p_ngay_moi: period.ngay_moi })
-          .order('thang').order('mch2').order('mch3').range(offset, offset + 499);
-        if (error) throw error;
-        rows.push(...data);
-        if (data.length < 500) break;
-      }
+      const rows = await readClkkGroups(period);
       const [hcxl, staff] = await Promise.all([
         supabase.from('v10_clkk_hcxl').select('dong').eq('ma_ch', period.ma_ch).eq('ngay_moi', period.ngay_moi).maybeSingle(),
         supabase.from('v10_clkk_nhan_su').select('mnv', { count: 'exact', head: true }).eq('ma_ch', period.ma_ch),

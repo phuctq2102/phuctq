@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowDownRight, ArrowUpRight, ClipboardList, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, RefreshCw, FileSpreadsheet, Wallet, TrendingDown, Percent, CalendarDays } from 'lucide-react';
 import { supabase } from './supabase';
 import { Button } from './components/ui/button';
 import { summarizeInventory } from './dashboardData';
+import { summarizeClkk } from './clkkData';
+import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
 import './dashboard.css';
 import { saveDashboardSnapshot } from './dashboardSnapshot';
 import { exportDashboard } from './dashboardExport';
@@ -11,6 +13,14 @@ const integer = new Intl.NumberFormat('vi-VN');
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
 const share = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 });
 const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
+
+const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const date = value => value.split('-').reverse().join('/');
+const tone = value => value < 0 ? 'negative' : value > 0 ? 'positive' : '';
+
+function Readout({ label, value, format = money }) {
+  return <div><small>{label}</small><strong className={tone(value)}>{value == null ? 'N/A' : format(value)}</strong></div>;
+}
 
 async function readPages(table, fields, key = 'id') {
   const pageSize = 500;
@@ -66,6 +76,48 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(true);
   const [exportError, setExportError] = useState('');
   const [error, setError] = useState('');
+  const [dates, setDates] = useState(null);
+  const [selectedPeriod, setSelectedPeriod] = useState('');
+  const [periodResult, setPeriodResult] = useState(null);
+  const [periodError, setPeriodError] = useState('');
+  const [periodsBusy, setPeriodsBusy] = useState(true);
+  const [showAllGroups, setShowAllGroups] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setPeriodsBusy(true);
+    setPeriodError('');
+    setDates(null);
+    readClkkPeriods().then(result => {
+      if (!active) return;
+      setDates(result);
+      setSelectedPeriod(previous => result.schedules.some(row => periodKey(row) === previous)
+        ? previous : result.schedules.length === 1 ? periodKey(result.schedules[0]) : '');
+    }).catch(error => {
+      if (active) setPeriodError(error.message);
+    }).finally(() => {
+      if (active) setPeriodsBusy(false);
+    });
+    return () => { active = false; };
+  }, [refresh]);
+
+  const period = dates?.schedules.find(row => periodKey(row) === selectedPeriod);
+  const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
+
+  useEffect(() => {
+    let active = true;
+    if (!period || sameMonth) return;
+    readClkkGroups(period).then(rows => {
+      if (active) setPeriodResult({ period, summary: summarizeClkk(rows, period, 0.003) });
+    }).catch(error => {
+      if (active) setPeriodResult({ period, error: error.message });
+    });
+    return () => { active = false; };
+  }, [period, sameMonth]);
+
+  const result = period && periodResult?.period === period ? periodResult : null;
+  const totals = result?.summary;
+  const isPeriodLoading = periodsBusy || Boolean(period && !sameMonth && !result);
 
   useEffect(() => {
     let active = true;
@@ -94,7 +146,7 @@ export default function Dashboard() {
   function downloadReport() {
     if (!snapshot || !summary || busy || error) return;
     setExportError('');
-    try { exportDashboard({ ...snapshot, summary, overview, industry }); }
+    try { exportDashboard({ ...snapshot, summary, overview, industry, period, totals }); }
     catch (err) { setExportError(err.message || 'Không xuất được báo cáo.'); }
   }
 
@@ -104,14 +156,40 @@ export default function Dashboard() {
     catch (err) { setExportError(err.message); }
   }
 
-  const chartScale = Math.max(1, ...summary?.industries.flatMap(row => [row.positive, -row.negative]) ?? []);
+  const rankedGroups = summary?.industries.filter(row => row.net < 0).slice(0, 10) ?? [];
+  const groups = showAllGroups ? summary?.industries ?? [] : rankedGroups;
+  const chartScale = Math.max(1, ...groups.flatMap(row => [row.positive, -row.negative]));
+  const primary = [
+    { label: 'Doanh thu không Fresh', value: totals?.revenue, Icon: Wallet },
+    { label: 'CLKK không Fresh', value: totals?.total, Icon: TrendingDown },
+    { label: 'Tỷ lệ CLKK / doanh thu', value: totals?.ratio, format: percent, Icon: Percent },
+  ];
 
 
   return <div ref={dashboardRef} className="dashboard-view" aria-busy={busy}>
+    <header className="dashboard-hero">
+      <div className="dashboard-hero-header">
+        <div><h2>Tổng quan kiểm kê</h2>
+          {period && <p className="dashboard-period-context"><CalendarDays size={16} aria-hidden="true"/>{period.ma_ch} · Ngày kiểm kê {date(period.ngay_moi)}</p>}
+        </div>
+        <label className="dashboard-period-picker">Kỳ kiểm kê
+          <select value={selectedPeriod} disabled={periodsBusy || !dates?.schedules.length} onChange={event => setSelectedPeriod(event.target.value)}>
+            <option value="">{periodsBusy ? 'Đang tải lịch…' : dates?.schedules.length ? 'Chọn kỳ kiểm kê' : 'Chưa có lịch phù hợp'}</option>
+            {dates?.schedules.map(row => <option key={periodKey(row)} value={periodKey(row)}>{row.ma_ch} · {date(row.ngay_moi)}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="dashboard-primary">
+        {primary.map(({ label, value, format, Icon }) => <div key={label}>
+          <Icon size={21} aria-hidden="true"/>
+          <Readout label={label} value={value} format={format}/>
+        </div>)}
+      </div>
+    </header>
     <div className="dashboard-toolbar">
-      <div><h2><ClipboardList size={20} aria-hidden="true"/> Chênh lệch theo DSCL</h2><p className="dashboard-caption">Giá trị gốc theo Danh sách mã hàng · Đơn vị VNĐ</p></div>
+      <div><p className="dashboard-caption">Nguồn ngày D: DSCL gốc · Đơn vị VND</p></div>
       <div className="dashboard-controls">
-        <label>Ngành hàng<select value={industry} onChange={event => setIndustry(event.target.value)}>
+        <label>MCH3 của DSCL<select className="dashboard-industry-select" value={industry} onChange={event => setIndustry(event.target.value)}>
           <option value="">Tất cả MCH3</option>
           {overview?.industries.filter(row => row.code).map(row => <option key={row.code} value={row.code}>{row.name} · {row.code}</option>)}
         </select></label>
@@ -128,11 +206,34 @@ export default function Dashboard() {
     {exportError && <p className="warning" role="alert">{exportError}</p>}
     {busy && <p role="status">Đang tải dữ liệu kiểm kê…</p>}
     {error && <p className="warning" role="alert">Không tải được dữ liệu mới. {error}</p>}
+    <section className="panel dashboard-panel">
+      <h2>Kết quả chênh lệch kiểm kê ngày D</h2>
+      <p className="dashboard-caption">Giá trị từ DSCL gốc, trước điều chỉnh Final.{period && !dates?.codes.length ? ' DSCL chưa có mã SAP để đối chiếu với kỳ đang chọn.' : ''}</p>
+      {summary && snapshot.inventory.length ? <DiscrepancyMetrics summary={summary}/> : !busy && !error && <p className="empty">Chưa có dữ liệu DSCL.</p>}
+    </section>
+    <section className="panel dashboard-panel dashboard-period-results">
+      <h2>Kết quả chênh lệch kiểm kê cả kỳ</h2>
+      {isPeriodLoading && <p role="status">Đang tải số liệu cả kỳ…</p>}
+      {(periodError || result?.error) && <p className="warning" role="alert">Không tải được số liệu cả kỳ. {periodError || result.error}</p>}
+      {!period && !isPeriodLoading && !periodError && <p className="empty">{dates?.schedules.length ? 'Chọn kỳ kiểm kê để xem số liệu SAP.' : 'Nhập lịch kiểm kê ở tab Báo cáo CLKK và Biên bản.'}</p>}
+      {sameMonth && <p className="warning">Kỳ cũ và kỳ mới cùng tháng. Cần xác nhận nghiệp vụ trước khi tính.</p>}
+      {totals && <>
+        <p className="dashboard-caption">Tạm tính với ngày D = 0. Cần xác nhận thời điểm cắt dữ liệu SAP tháng T.</p>
+        {totals.missing.length > 0 && <p className="warning">Thiếu dữ liệu SAP tháng {totals.missing.join(', ')}.</p>}
+        {totals.invalidCategory && <p className="warning">Có nhóm thiếu MCH2, chưa phân loại Fresh hoặc không Fresh.</p>}
+        {totals.revenue === 0 && <p className="warning">Doanh thu không Fresh bằng 0. Chưa thể tính tỷ lệ CLKK.</p>}
+        <div className="inv-kpis dashboard-kpis">
+          <Readout label="CL không Fresh trước tháng T" value={totals.before}/>
+          <Readout label="CL không Fresh tháng T + D" value={totals.during}/>
+          <Readout label="CL Fresh cả kỳ" value={totals.fresh}/>
+          <Readout label="Vượt định mức 0,30%" value={totals.excess}/>
+        </div>
+      </>}
+    </section>
     {summary && <>
-      <DiscrepancyMetrics summary={summary}/>
       <section className="panel dashboard-panel">
-        <h2>Chênh lệch ròng (netoff) theo MCH2</h2>
-        <p className="dashboard-caption">Tỉ trọng = trị tuyệt đối lệch ròng của ngành chia cho tổng trị tuyệt đối lệch ròng các MCH2.</p>
+        <h2>Kết quả MCH2</h2>
+        <p className="dashboard-caption">Toàn bộ DSCL · Tỷ trọng tính theo độ lớn của chênh lệch ròng.</p>
         <div className="dashboard-mch2-list">
           {overview.parents.map(row => <section key={row.code} className="dashboard-mch2-group">
             <h3>{row.name}{row.code && <span>{row.code}</span>}</h3>
@@ -146,12 +247,14 @@ export default function Dashboard() {
         {!overview.parents.length && <p className="empty">Không có dữ liệu DSCL.</p>}
       </section>
       <section className="panel dashboard-panel">
-        <h2>Top thất thoát theo MCH3</h2>
-        <p className="dashboard-caption">Sắp theo chênh lệch ròng từ âm nhất đến dương nhất.</p>
+        <div className="dashboard-section-heading">
+          <div><h2>Top MCH3</h2><p className="dashboard-caption">{showAllGroups ? 'Tất cả MCH3, xếp theo chênh lệch ròng.' : '10 MCH3 có chênh lệch ròng âm lớn nhất.'}</p></div>
+          {summary.industries.length > 0 && <Button type="button" variant="outline" aria-pressed={showAllGroups} onClick={() => setShowAllGroups(value => !value)}>{showAllGroups ? 'Xem Top 10' : 'Xem tất cả'}</Button>}
+        </div>
         <div className="tablewrap dashboard-scroll">
           <table className="dashboard-mch-table">
             <thead><tr><th scope="col">Ngành hàng</th><th scope="col">Dòng DSCL</th><th scope="col">Lệch âm</th><th scope="col">Lệch dương</th><th scope="col">Ròng</th></tr></thead>
-            <tbody>{summary.industries.map(row => <tr key={row.code}>
+            <tbody>{groups.map(row => <tr key={row.code}>
               <th scope="row">{row.name}<small>{row.code}</small></th>
               <td>{integer.format(row.count)}</td>
               <td className="negative">{money(row.negative)}<div className="dashboard-bar" aria-hidden="true"><span style={{ width: (-row.negative / chartScale) * 100 + '%' }}/></div></td>
@@ -160,12 +263,12 @@ export default function Dashboard() {
             </tr>)}</tbody>
           </table>
         </div>
-        {!summary.industries.length && <p className="empty">Không có dữ liệu DSCL.</p>}
+        {!groups.length && <p className="empty">Không có MCH3 phù hợp.</p>}
       </section>
-      <div className="dashboard-split">
+      <section className="dashboard-product-section"><h2>Top 10 mã hàng lệch âm và lệch dương</h2><div className="dashboard-split">
         <ProductRanking title="10 mã lệch âm lớn nhất" rows={summary.negativeTop} direction="negative"/>
         <ProductRanking title="10 mã lệch dương lớn nhất" rows={summary.positiveTop} direction="positive"/>
-      </div>
+      </div></section>
     </>}
   </div>;
 }
