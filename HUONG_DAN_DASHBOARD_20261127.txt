@@ -1,0 +1,7 @@
+TOP 10 Option 3 + Xuất Excel PA1
+Thay đổi: src/Dashboard.jsx, src/dashboard.css, src/dashboardExport.js (mới).
+Không đổi logic dashboardData.js, SQL, Supabase, Final, phân công hay nhân viên.
+Excel 6 sheet, dữ liệu số, định dạng số, lọc, độ rộng cột. Không có biểu đồ Excel nhúng hoặc công thức động; thư viện xlsx hiện tại không hỗ trợ tạo biểu đồ nhúng.
+MCH2 luôn toàn bộ DSCL như giao diện hiện tại; KPI, MCH3 và TOP 10 theo bộ lọc. DATA toàn bộ DSCL có cột Trong bộ lọc.
+Tên file Dashboard_KiemKe_YYYYMMDD.xlsx (không truy vấn thêm mã cửa hàng).
+Không đưa .env.local vào ZIP; giữ cấu hình môi trường hiện có trên Vercel và máy cá nhân.
