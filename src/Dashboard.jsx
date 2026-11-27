@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { ArrowDownRight, ArrowUpRight, RefreshCw, FileSpreadsheet, Wallet, TrendingDown, Percent, CalendarDays } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, RefreshCw, FileSpreadsheet, Wallet, TrendingDown, Percent, CalendarDays, CircleAlert } from 'lucide-react';
 import { supabase } from './supabase';
 import { Button } from './components/ui/button';
 import { summarizeInventory } from './dashboardData';
@@ -160,9 +160,10 @@ export default function Dashboard() {
   const groups = showAllGroups ? summary?.industries ?? [] : rankedGroups;
   const chartScale = Math.max(1, ...groups.flatMap(row => [row.positive, -row.negative]));
   const primary = [
+    { label: 'Tổng CLKK MCH3 (không Fresh)', value: totals?.total, Icon: TrendingDown },
     { label: 'Doanh thu không Fresh', value: totals?.revenue, Icon: Wallet },
-    { label: 'CLKK không Fresh', value: totals?.total, Icon: TrendingDown },
     { label: 'Tỷ lệ CLKK / doanh thu', value: totals?.ratio, format: percent.format, Icon: Percent },
+    { label: 'GT VĐM (định mức 0,30%)', value: totals?.excess, Icon: CircleAlert },
   ];
 
 
