@@ -1,15 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ClipboardList, MapPin, RefreshCw } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ClipboardList, RefreshCw } from 'lucide-react';
 import { supabase } from './supabase';
 import { Button } from './components/ui/button';
-import { summarizeInventory, summarizeZones } from './dashboardData';
+import { summarizeInventory } from './dashboardData';
 import './dashboard.css';
 
 const integer = new Intl.NumberFormat('vi-VN');
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
-const countTime = new Intl.DateTimeFormat('vi-VN', {
-  timeZone: 'Asia/Ho_Chi_Minh', dateStyle: 'short', timeStyle: 'medium', hourCycle: 'h23',
-});
 const share = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 });
 const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
 
@@ -22,25 +19,6 @@ async function readPages(table, fields, key = 'id') {
     rows.push(...data);
     if (data.length < pageSize) return rows;
   }
-}
-
-function roundDuration({ first, last }) {
-  const seconds = Math.floor((last - first) / 1000);
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor(seconds / 60) % 60;
-  return [hours, minutes, seconds % 60].map(value => String(value).padStart(2, '0')).join(':');
-}
-
-function RoundCell({ round }) {
-  const updaters = [...round.updaters].sort((a, b) => a.localeCompare(b, 'vi')).join(', ');
-  return <td className="dashboard-round">
-    {round.count ? <>
-      <strong>{roundDuration(round)}</strong>
-      <small>Đầu: {countTime.format(round.first)}</small>
-      <small>Cuối: {countTime.format(round.last)}</small>
-    </> : <span>Chưa có giờ cập nhật</span>}
-    {updaters && <small>Người cập nhật: {updaters}</small>}
-  </td>;
 }
 
 function DiscrepancyMetrics({ summary }) {
@@ -77,10 +55,9 @@ function ProductRanking({ title, rows, direction }) {
   </section>;
 }
 
-export default function Dashboard({ onOpenCtKvImport }) {
+export default function Dashboard() {
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');
-  const [zone, setZone] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
@@ -92,10 +69,9 @@ export default function Dashboard({ onOpenCtKvImport }) {
     Promise.all([
       readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech,sl_dem,sl_so'),
       readPages('v10_nganh_hang', 'ma_nhom,ten_nganh,ma_mch2,ten_mch2', 'ma_nhom'),
-      readPages('ct_kv', 'ma_sp,khu_vuc,du_lieu_goc'),
-    ]).then(([inventory, catalog, details]) => {
+    ]).then(([inventory, catalog]) => {
       if (!active) return;
-      setSnapshot({ inventory, catalog: new Map(catalog.map(row => [row.ma_nhom, row])), zones: summarizeZones(details) });
+      setSnapshot({ inventory, catalog: new Map(catalog.map(row => [row.ma_nhom, row])) });
     }).catch(error => {
       if (active) setError(error.message);
     }).finally(() => {
@@ -166,29 +142,6 @@ export default function Dashboard({ onOpenCtKvImport }) {
         <ProductRanking title="10 mã lệch âm lớn nhất" rows={summary.negativeTop} direction="negative"/>
         <ProductRanking title="10 mã lệch dương lớn nhất" rows={summary.positiveTop} direction="positive"/>
       </div>
-      <section className="panel dashboard-panel">
-        <div className="dashboard-toolbar">
-          <div><h2><MapPin size={20} aria-hidden="true"/> Kiểm đếm theo khu vực · CTKV</h2><p className="dashboard-caption">Thời lượng mỗi vòng = thời điểm bắn cuối − thời điểm bắn đầu trong cùng khu vực.</p></div>
-          <label>Khu vực<select value={zone} onChange={event => setZone(event.target.value)}>
-            <option value="">Tất cả khu vực</option>
-            {snapshot.zones.filter(row => row.zone).map(row => <option key={row.zone}>{row.zone}</option>)}
-          </select></label>
-        </div>
-        {snapshot.zones.length > 0 && !snapshot.zones.some(row => row.rounds.some(round => round.count)) &&
-          <div className="notice dashboard-round-notice">
-            <span>CT_KV của kỳ hiện tại chưa có giờ cập nhật. Chọn file xuất đầy đủ của kỳ đang kiểm để xem thời lượng từng vòng.</span>
-            <Button type="button" variant="outline" onClick={onOpenCtKvImport}>Mở mục nhập CT_KV</Button>
-          </div>}
-        <div className="tablewrap dashboard-scroll">
-          <table>
-            <thead><tr><th scope="col">Khu vực</th><th scope="col">Mã sản phẩm</th><th scope="col">Dòng CTKV</th><th scope="col">Round 1</th><th scope="col">Round 2</th></tr></thead>
-            <tbody>{snapshot.zones.filter(row => !zone || row.zone === zone).map(row => <tr key={row.zone}>
-              <th scope="row">{row.zone || 'Chưa có khu vực'}</th><td>{integer.format(row.products.size)}</td><td>{integer.format(row.lines)}</td><RoundCell round={row.rounds[0]}/><RoundCell round={row.rounds[1]}/>
-            </tr>)}</tbody>
-          </table>
-        </div>
-        {!snapshot.zones.length && <p className="empty">Không có dữ liệu CTKV.</p>}
-      </section>
     </>}
   </div>;
 }

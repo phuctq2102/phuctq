@@ -38,10 +38,6 @@
 .dashboard-mch2-group dl > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 2px 8px; }
 .dashboard-mch2-group dt { color: var(--muted); font-size: .875rem; }
 .dashboard-mch2-group dd { margin: 0; font-weight: 650; overflow-wrap: anywhere; }
-.dashboard-scroll .dashboard-updaters { white-space: normal; min-width: 130px; }
 @media (max-width: 900px) {
   .dashboard-mch2-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.dashboard-scroll .dashboard-round { min-width: 175px; white-space: normal; vertical-align: top; }
-.dashboard-round small { margin-top: 3px; }
-.dashboard-round-notice { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 10px; margin-bottom: 0; }

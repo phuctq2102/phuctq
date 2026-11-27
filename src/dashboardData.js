@@ -56,31 +56,3 @@ export function summarizeInventory(rows, catalog) {
       .sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
   };
 }
-
-export function summarizeZones(rows) {
-  const zones = new Map();
-  for (const row of rows) {
-    const zone = text(row.khu_vuc);
-    if (!zones.has(zone)) zones.set(zone, {
-      zone, lines: 0, products: new Set(),
-      rounds: [1, 2].map(() => ({ count: 0, first: Infinity, last: -Infinity, updaters: new Set() })),
-    });
-    const summary = zones.get(zone);
-    summary.lines += 1;
-    const source = row.du_lieu_goc;
-    for (const [index, key] of ['round1_at', 'round2_at'].entries()) {
-      const round = summary.rounds[index];
-      const updater = text(index === 0 ? source?.nguoi_cap_nhat : source?.nguoi_cap_nhat_round2);
-      if (updater) round.updaters.add(updater);
-      const raw = source?.[key];
-      const timestamp = typeof raw === 'string' ? Date.parse(raw) : NaN;
-      if (!Number.isFinite(timestamp)) continue;
-      round.count += 1;
-      round.first = Math.min(round.first, timestamp);
-      round.last = Math.max(round.last, timestamp);
-    }
-    const code = text(row.ma_sp);
-    if (code) summary.products.add(code);
-  }
-  return [...zones.values()].sort((a, b) => Number(!a.zone) - Number(!b.zone) || a.zone.localeCompare(b.zone, 'vi', { numeric: true }));
-}
