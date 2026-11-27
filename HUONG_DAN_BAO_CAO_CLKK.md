@@ -33,6 +33,6 @@ Kiểm tra kỳ bắt đầu ngày 01 của tháng sau kỳ cũ, doanh thu khôn
 ## Nhập các file Excel thực tế
 
 - Lịch kiểm kê nhận cột **Ngày kiểm kê trước** và **Lịch kiểm kê** có năm trong tiêu đề. Khi DSCL chưa có mã SAP, Admin chọn kỳ trong lịch để xem báo cáo SAP độc lập.
-- GT_HCXL đọc số tiền có sẵn và điều kiện đổi trả. App tra lịch theo từng mã cửa hàng trong file. Khi có một lịch khớp, app điền ngày tự động. Khi có nhiều lịch, Admin chọn kỳ. Khi thiếu lịch, nhập lịch của cửa hàng trước. Khi nhập lại cùng mã và ngày, app thay thế dữ liệu HCXL của kỳ đó.
+- GT_HCXL đọc số tiền có sẵn và điều kiện đổi trả. App tra lịch theo từng mã cửa hàng trong file. Khi có một lịch khớp, app điền ngày tự động. Khi có nhiều lịch, Admin chọn kỳ. Có thể nhập riêng từng cửa hàng hoặc nhập chung các cửa hàng đã có kỳ. Các cửa hàng thiếu lịch vẫn còn trong bản xem trước khi nhập lịch bổ sung. Khi nhập lại cùng mã và ngày, app thay thế dữ liệu HCXL của kỳ đó.
 - Danh mục nhân sự dùng ba cột **MNV**, **Tên NV**, **CH**. Nhập lại cập nhật theo CH và MNV. Danh mục này phục vụ báo cáo và biên bản, tách khỏi tài khoản đăng nhập.
 - Cài thêm `V10_BAO_CAO_CLKK_DANH_MUC.sql` sau migration CLKK giai đoạn 1 để bật hai phần nhập mới. Cài `V10_RESET_GIU_BC.sql` sau RPC Reset gốc; SQL cài đặt chỉ đăng ký RPC có xác nhận, xóa dữ liệu diễn ra khi Admin thực hiện Reset.

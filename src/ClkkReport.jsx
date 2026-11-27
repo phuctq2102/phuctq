@@ -22,7 +22,7 @@ export default function ClkkReport() {
   const [periods, setPeriods] = useState([]);
   const [hcxlDates, setHcxlDates] = useState({});
   const [selected, setSelected] = useState('');
-  const [draft, setDraft] = useState(null);
+  const [drafts, setDrafts] = useState({});
   const [report, setReport] = useState(null);
   const [filters, setFilters] = useState(blankFilters);
   const [rate, setRate] = useState('0.3');
@@ -51,23 +51,33 @@ export default function ClkkReport() {
     setFilters(blankFilters);
   }
 
+  function setDraft(kind, draft) {
+    setDrafts(previous => ({ ...previous, [kind]: draft }));
+  }
+
+  async function prepareHcxl(draft, existingDates = {}) {
+    const schedules = new Map(draft.data.map(({ ma_ch }) => [ma_ch, []]));
+    for (const row of await readClkkSchedules([...schedules.keys()])) {
+      schedules.get(row.ma_ch)?.push(row.ngay_moi);
+    }
+    setHcxlDates(Object.fromEntries(
+      [...schedules].map(([code, days]) => [
+        code, days.includes(existingDates[code]) ? existingDates[code] : days.length === 1 ? days[0] : '',
+      ]),
+    ));
+    setDraft('hcxl', { ...draft, schedules });
+  }
+
   async function preview(file, kind) {
     if (!file) return;
-    setDraft(null);
+    setDraft(kind, null);
     setMessage('');
     setBusy(true);
     try {
       const data = await readClkkFile(file, imports[kind].parse);
-      let schedules;
-      if (kind === 'hcxl') {
-        schedules = new Map(data.map(({ ma_ch }) => [ma_ch, []]));
-        const rows = await readClkkSchedules([...schedules.keys()]);
-        for (const row of rows) schedules.get(row.ma_ch)?.push(row.ngay_moi);
-        setHcxlDates(Object.fromEntries(
-          [...schedules].filter(([, days]) => days.length === 1).map(([code, [day]]) => [code, day]),
-        ));
-      }
-      setDraft({ data, kind, name: file.name, schedules });
+      const draft = { data, kind, name: file.name };
+      if (kind === 'hcxl') await prepareHcxl(draft);
+      else setDraft(kind, draft);
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -75,19 +85,38 @@ export default function ClkkReport() {
     }
   }
 
-  async function saveUpload() {
+  async function saveUpload(draft, storeCode) {
+    const { kind, data } = draft;
+    const { table, key } = imports[kind];
+    const payload = kind === 'hcxl'
+      ? data.filter(row => (!storeCode || row.ma_ch === storeCode) && draft.schedules.get(row.ma_ch).includes(hcxlDates[row.ma_ch]))
+        .map(row => ({ ...row, ngay_moi: hcxlDates[row.ma_ch] }))
+      : data;
+    if (busy || !payload.length) return;
     setBusy(true);
     setMessage('');
-    const { table, key } = imports[draft.kind];
-    const payload = draft.kind === 'hcxl' ? draft.data.map(row => ({ ...row, ngay_moi: hcxlDates[row.ma_ch] })) : draft.data;
     try {
       const { error } = await supabase.from(table).upsert(payload, { onConflict: key });
       if (error) throw error;
       clearReport();
-      setDraft(null);
       setConfirmed(false);
-      if (draft.kind === 'schedule') await loadPeriods();
-      setMessage('Đã lưu dữ liệu.');
+      if (kind === 'hcxl') {
+        const savedCodes = new Set(payload.map(row => row.ma_ch));
+        const remaining = data.filter(row => !savedCodes.has(row.ma_ch));
+        setDraft(kind, remaining.length ? { ...draft, data: remaining } : null);
+        setMessage(`Đã lưu HCXL cho ${[...savedCodes].join(', ')}.${remaining.length ? ` Còn ${remaining.length} cửa hàng trong bản xem trước.` : ''}`);
+      } else {
+        setDraft(kind, null);
+        setMessage(`Đã lưu ${payload.length} ${imports[kind].unit} từ ${draft.name}.`);
+        if (kind === 'schedule') {
+          try {
+            await loadPeriods();
+            if (drafts.hcxl) await prepareHcxl(drafts.hcxl, hcxlDates);
+          } catch (error) {
+            setMessage(`Đã lưu lịch, nhưng chưa tải lại được danh sách kỳ. ${error.message}`);
+          }
+        }
+      }
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -183,7 +212,8 @@ export default function ClkkReport() {
           onChange={event => { preview(event.target.files[0], kind); event.target.value = ''; }}/>
       </label>)}
     </div>
-    {draft && <div>
+    {Object.values(drafts).filter(Boolean).map(draft => <section className="panel" key={draft.kind}>
+      <h3>{imports[draft.kind].label}</h3>
       <p>{draft.name} · {draft.data.length} {imports[draft.kind].unit}. Các khóa trùng sẽ được cập nhật.</p>
       {draft.kind === 'hcxl' && <div className="clkk-grid">{draft.data.map(({ ma_ch, dong }) => {
         const days = draft.schedules.get(ma_ch);
@@ -199,11 +229,13 @@ export default function ClkkReport() {
               ? `Ngày kiểm kê ${days[0].split('-').reverse().join('/')}`
               : 'Chưa có lịch. Cần nhập lịch kiểm kê của cửa hàng này.'}
           </p>}
+          <button type="button" disabled={busy || !hcxlDates[ma_ch]} onClick={() => saveUpload(draft, ma_ch)}>Nhập {ma_ch}</button>
         </div>;
       })}</div>}
-      <button type="button" disabled={busy || (draft.kind === 'hcxl' && draft.data.some(row => !hcxlDates[row.ma_ch]))} onClick={saveUpload}>Xác nhận nhập</button>{' '}
-      <button type="button" disabled={busy} onClick={() => setDraft(null)}>Hủy</button>
-    </div>}
+      <button type="button" disabled={busy || (draft.kind === 'hcxl' && !draft.data.some(row => hcxlDates[row.ma_ch]))}
+        onClick={() => saveUpload(draft)}>{draft.kind === 'hcxl' ? 'Nhập các cửa hàng đã chọn kỳ' : 'Xác nhận nhập'}</button>{' '}
+      <button type="button" disabled={busy} onClick={() => setDraft(draft.kind, null)}>Hủy</button>
+    </section>)}
     <p>{stores.length ? `Mã SAP từ DSCL: ${stores.join(', ')}` : 'DSCL chưa có mã SAP. Chọn kỳ trong lịch để xem báo cáo SAP độc lập.'}</p>
     <div className="clkk-grid">
       <label>Kỳ kiểm kê<select value={selected} disabled={busy} onChange={event => { setSelected(event.target.value); setConfirmed(false); clearReport(); }}>
