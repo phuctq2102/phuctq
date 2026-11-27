@@ -3,6 +3,7 @@ const number = value => Number(value) || 0;
 
 export function summarizeInventory(rows, catalog) {
   const byIndustry = new Map();
+  const byParent = new Map();
   const products = new Map();
   let positive = 0;
   let negative = 0;
@@ -10,8 +11,14 @@ export function summarizeInventory(rows, catalog) {
   for (const row of rows) {
     const code = text(row.nhom_vat_tu);
     const value = number(row.gt_chenh_lech);
+    const category = catalog.get(code);
+    const parentCode = category?.ma_mch2 || '';
+    if (!byParent.has(parentCode)) {
+      byParent.set(parentCode, { code: parentCode, name: category?.ten_mch2 || parentCode || 'Chưa đối chiếu MCH2', net: 0 });
+    }
+    byParent.get(parentCode).net += value;
     if (!byIndustry.has(code)) {
-      byIndustry.set(code, { code, name: catalog.get(code) || code || 'Chưa có nhóm vật tư', positive: 0, negative: 0, count: 0 });
+      byIndustry.set(code, { code, name: category?.ten_nganh || code || 'Chưa có nhóm vật tư', positive: 0, negative: 0, count: 0 });
     }
     const group = byIndustry.get(code);
     group.count += 1;
@@ -25,8 +32,10 @@ export function summarizeInventory(rows, catalog) {
 
     const productCode = text(row.ma_sp);
     if (!productCode) continue;
-    const product = products.get(productCode) || { code: productCode, name: text(row.ten_sp), value: 0 };
+    const product = products.get(productCode) || { code: productCode, name: text(row.ten_sp), value: 0, counted: 0, book: 0 };
     product.value += value;
+    product.counted += number(row.sl_dem);
+    product.book += number(row.sl_so);
     products.set(productCode, product);
   }
 
@@ -37,7 +46,9 @@ export function summarizeInventory(rows, catalog) {
     productCount: products.size,
     positiveTop: ranked.slice().reverse().filter(row => row.value > 0).slice(0, 10),
     negativeTop: ranked.filter(row => row.value < 0).slice(0, 10),
-    industries: [...byIndustry.values()].sort((a, b) => b.positive - b.negative - (a.positive - a.negative)),
+    parents: [...byParent.values()].sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
+    industries: [...byIndustry.values()].map(row => ({ ...row, net: row.positive + row.negative }))
+      .sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
   };
 }
 

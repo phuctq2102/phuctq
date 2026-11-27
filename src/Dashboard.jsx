@@ -28,6 +28,11 @@ function ProductRanking({ title, rows, direction }) {
       {rows.map(row => <li key={row.code}>
         <div><strong>{row.name || row.code}</strong>{row.name && <small>{row.code}</small>}</div>
         <strong className={direction}>{money(row.value)}</strong>
+        <dl className="dashboard-quantities">
+          <div><dt>SL đếm</dt><dd>{integer.format(row.counted)}</dd></div>
+          <div><dt>SL trên sổ</dt><dd>{integer.format(row.book)}</dd></div>
+          <div><dt>SL chênh lệch</dt><dd className={row.counted < row.book ? 'negative' : row.counted > row.book ? 'positive' : ''}>{integer.format(row.counted - row.book)}</dd></div>
+        </dl>
       </li>)}
     </ol> : <p className="empty">Không có mã phù hợp.</p>}
   </section>;
@@ -46,12 +51,12 @@ export default function Dashboard() {
     setBusy(true);
     setError('');
     Promise.all([
-      readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech'),
-      readPages('v10_nganh_hang', 'ma_nhom,ten_nganh', 'ma_nhom'),
+      readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech,sl_dem,sl_so'),
+      readPages('v10_nganh_hang', 'ma_nhom,ten_nganh,ma_mch2,ten_mch2', 'ma_nhom'),
       readPages('ct_kv', 'ma_sp,khu_vuc'),
     ]).then(([inventory, catalog, details]) => {
       if (!active) return;
-      setSnapshot({ inventory, catalog: new Map(catalog.map(row => [row.ma_nhom, row.ten_nganh])), zones: summarizeZones(details) });
+      setSnapshot({ inventory, catalog: new Map(catalog.map(row => [row.ma_nhom, row])), zones: summarizeZones(details) });
     }).catch(error => {
       if (active) setError(error.message);
     }).finally(() => {
@@ -94,7 +99,22 @@ export default function Dashboard() {
         {metrics.map(([label, value, tone]) => <div key={label}><small>{label}</small><strong className={tone}>{value}</strong></div>)}
       </div>
       <section className="panel dashboard-panel">
-        <h2>Giá trị chênh lệch theo MCH3</h2>
+        <h2>Chênh lệch ròng (netoff) theo MCH2</h2>
+        <p className="dashboard-caption">Tổng lệch âm cộng tổng lệch dương của các mã thuộc từng ngành, trên toàn bộ DSCL.</p>
+        <div className="tablewrap dashboard-scroll">
+          <table>
+            <thead><tr><th scope="col">Ngành hàng MCH2</th><th scope="col">Chênh lệch ròng</th></tr></thead>
+            <tbody>{overview.parents.map(row => <tr key={row.code}>
+              <th scope="row">{row.name}<small>{row.code}</small></th>
+              <td className={row.net < 0 ? 'negative' : row.net > 0 ? 'positive' : ''}>{money(row.net)}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {!overview.parents.length && <p className="empty">Không có dữ liệu DSCL.</p>}
+      </section>
+      <section className="panel dashboard-panel">
+        <h2>Top thất thoát theo MCH3</h2>
+        <p className="dashboard-caption">Sắp theo chênh lệch ròng từ âm nhất đến dương nhất.</p>
         <div className="tablewrap dashboard-scroll">
           <table className="dashboard-mch-table">
             <thead><tr><th scope="col">Ngành hàng</th><th scope="col">Dòng DSCL</th><th scope="col">Lệch âm</th><th scope="col">Lệch dương</th><th scope="col">Ròng</th></tr></thead>
@@ -103,7 +123,7 @@ export default function Dashboard() {
               <td>{integer.format(row.count)}</td>
               <td className="negative">{money(row.negative)}<div className="dashboard-bar" aria-hidden="true"><span style={{ width: (-row.negative / chartScale) * 100 + '%' }}/></div></td>
               <td className="positive">{money(row.positive)}<div className="dashboard-bar" aria-hidden="true"><span style={{ width: (row.positive / chartScale) * 100 + '%' }}/></div></td>
-              <td>{money(row.negative + row.positive)}</td>
+              <td className={row.net < 0 ? 'negative' : row.net > 0 ? 'positive' : ''}>{money(row.net)}</td>
             </tr>)}</tbody>
           </table>
         </div>
@@ -115,7 +135,7 @@ export default function Dashboard() {
       </div>
       <section className="panel dashboard-panel">
         <div className="dashboard-toolbar">
-          <div><h2><MapPin size={20} aria-hidden="true"/> Kiểm đếm theo khu vực · CTKV</h2><p className="dashboard-caption">CTKV hiện chưa lưu thời điểm kiểm đếm Round 1 và Round 2.</p></div>
+          <div><h2><MapPin size={20} aria-hidden="true"/> Kiểm đếm theo khu vực · CTKV</h2><p className="dashboard-caption">Thời lượng mỗi vòng = thời điểm bắn cuối − thời điểm bắn đầu trong cùng khu vực. CTKV chưa có các mốc này.</p></div>
           <label>Khu vực<select value={zone} onChange={event => setZone(event.target.value)}>
             <option value="">Tất cả khu vực</option>
             {snapshot.zones.filter(row => row.zone).map(row => <option key={row.zone}>{row.zone}</option>)}

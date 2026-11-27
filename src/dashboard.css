@@ -26,3 +26,7 @@
   .dashboard-split { grid-template-columns: minmax(0, 1fr); }
   .dashboard-kpis > div { padding: 12px; }
 }
+.dashboard-quantities { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 0; }
+.dashboard-quantities > div { padding: 6px 8px; background: var(--tint); border-radius: 6px; min-width: 0; }
+.dashboard-quantities dt { font-size: .8125rem; color: var(--muted); }
+.dashboard-quantities dd { margin: 3px 0 0; font-weight: 650; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }

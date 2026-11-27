@@ -42,7 +42,7 @@ export default function IndustryImport({ onSaved }) {
 
   return <section className="importpanel-inner">
     <h2>Cập nhật danh mục ngành hàng</h2>
-    <p>Chọn file Excel có cột MCH3_ID và MCH3_Desc. Mã đã có sẽ được cập nhật tên.</p>
+    <p>Chọn file Excel có cột MCH3_ID và MCH3_Desc. Thêm cột MCH2_ID và MCH2_Desc để cập nhật ngành cha trên Dashboard.</p>
     <input aria-label="Chọn file danh mục ngành hàng" type="file" accept=".xlsx,.xls" disabled={busy} onChange={chooseFile}/>
     {entries.length > 0 && <>
       <p>{entries.length} mã hợp lệ · {entries.slice(0, 3).map(row => row.ma_nhom + ' · ' + row.ten_nganh).join(' / ')}</p>
