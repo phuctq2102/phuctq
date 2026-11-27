@@ -41,3 +41,18 @@
 @media (max-width: 900px) {
   .dashboard-mch2-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+/* TOP 10 – Modern Card, scoped to Dashboard only */
+.dashboard-ranking { list-style: none; padding: 0; gap: 10px; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: stretch; }
+.dashboard-ranking li.dashboard-product-card { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card, transparent); }
+.dashboard-card-heading { display: flex; align-items: center; gap: 8px; }
+.dashboard-rank-number { display: inline-flex; align-items: center; justify-content: center; min-width: 32px; height: 30px; border-radius: 8px; font-weight: 700; background: #fef2f2; color: #b91c1c; }
+.dashboard-product-card.positive .dashboard-rank-number { background: #ecfdf5; color: #047857; }
+.dashboard-product-name { flex: 1; min-width: 0; color: var(--text, inherit); }
+.dashboard-product-name strong { font-size: .875rem; line-height: 1.35; }
+.dashboard-ranking li > strong.dashboard-card-value { font-size: clamp(1rem,1.5vw,1.4rem); margin: 0; overflow-wrap: anywhere; }
+.dashboard-product-card .dashboard-quantities { border-top: 1px solid var(--line); padding-top: 8px; margin: 0; gap: 5px; }
+.dashboard-product-card .dashboard-quantities > div { background: transparent; padding: 0; }
+.dashboard-product-card .dashboard-quantities dt { font-size: .72rem; }
+.dashboard-product-card .dashboard-quantities dd { font-size: .875rem; }
+@media (min-width: 761px) and (max-width: 1150px) { .dashboard-ranking { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 480px) { .dashboard-ranking { grid-template-columns: minmax(0,1fr); } }

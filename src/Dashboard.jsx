@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, ClipboardList, RefreshCw } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, ClipboardList, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from './supabase';
 import { Button } from './components/ui/button';
 import { summarizeInventory } from './dashboardData';
 import './dashboard.css';
+import { exportDashboard } from './dashboardExport';
 
 const integer = new Intl.NumberFormat('vi-VN');
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
@@ -42,9 +43,10 @@ function ProductRanking({ title, rows, direction }) {
   return <section className="panel dashboard-panel">
     <h2><Icon size={19} aria-hidden="true"/> {title}</h2>
     {rows.length ? <ol className="dashboard-ranking">
-      {rows.map(row => <li key={row.code}>
-        <div><strong>{row.name || row.code}</strong>{row.name && <small>{row.code}</small>}</div>
-        <strong className={direction}>{money(row.value)}</strong>
+      {rows.map((row, index) => <li key={row.code} className={`dashboard-product-card ${direction}`}>
+        <div className="dashboard-card-heading"><span className="dashboard-rank-number">{String(index + 1).padStart(2, '0')}</span><small>{direction === 'negative' ? 'Lệch âm' : 'Lệch dương'}</small></div>
+        <div className="dashboard-product-name"><strong>{row.name || row.code}</strong>{row.name && <small>{row.code}</small>}</div>
+        <strong className={`dashboard-card-value ${direction}`}>{money(row.value)}</strong>
         <dl className="dashboard-quantities">
           <div><dt>SL đếm</dt><dd>{integer.format(row.counted)}</dd></div>
           <div><dt>SL trên sổ</dt><dd>{integer.format(row.book)}</dd></div>
@@ -60,6 +62,7 @@ export default function Dashboard() {
   const [industry, setIndustry] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [busy, setBusy] = useState(true);
+  const [exportError, setExportError] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -86,6 +89,13 @@ export default function Dashboard() {
     return summarizeInventory(snapshot.inventory.filter(row => String(row.nhom_vat_tu ?? '').trim() === industry), snapshot.catalog);
   }, [snapshot, overview, industry]);
 
+  function downloadReport() {
+    if (!snapshot || !summary || busy || error) return;
+    setExportError('');
+    try { exportDashboard({ ...snapshot, summary, overview, industry }); }
+    catch (err) { setExportError(err.message || 'Không xuất được báo cáo.'); }
+  }
+
   const chartScale = Math.max(1, ...summary?.industries.flatMap(row => [row.positive, -row.negative]) ?? []);
 
 
@@ -100,8 +110,12 @@ export default function Dashboard() {
         <Button type="button" variant="outline" disabled={busy} onClick={() => setRefresh(value => value + 1)}>
           <RefreshCw size={16} aria-hidden="true"/> Tải lại
         </Button>
+        <Button type="button" disabled={busy || !!error || !summary} onClick={downloadReport}>
+          <FileSpreadsheet size={16} aria-hidden="true"/> Xuất Excel
+        </Button>
       </div>
     </div>
+    {exportError && <p className="warning" role="alert">{exportError}</p>}
     {busy && <p role="status">Đang tải dữ liệu kiểm kê…</p>}
     {error && <p className="warning" role="alert">Không tải được dữ liệu mới. {error}</p>}
     {summary && <>
