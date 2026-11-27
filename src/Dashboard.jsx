@@ -162,7 +162,7 @@ export default function Dashboard() {
   const primary = [
     { label: 'Doanh thu không Fresh', value: totals?.revenue, Icon: Wallet },
     { label: 'CLKK không Fresh', value: totals?.total, Icon: TrendingDown },
-    { label: 'Tỷ lệ CLKK / doanh thu', value: totals?.ratio, format: percent, Icon: Percent },
+    { label: 'Tỷ lệ CLKK / doanh thu', value: totals?.ratio, format: percent.format, Icon: Percent },
   ];
 
 
