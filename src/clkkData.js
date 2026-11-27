@@ -165,3 +165,29 @@ export function summarizeHcxl(rows) {
     incomplete: rows.filter(row => row.thanh_tien == null || row.doi_tra == null).length,
   };
 }
+
+export function summarizePeriodCategories(rows, period) {
+  const monthT = period.ngay_moi.slice(0, 7);
+  const departments = new Map();
+  const categories = new Map();
+
+  function accumulate(groups, key, fields, row) {
+    const group = groups.get(key) ?? { ...fields, net: 0, value: null, revenue: null };
+    group.net += Number(row.cl_goc ?? 0);
+    if (row.doanh_thu != null) group.revenue = (group.revenue ?? 0) + Number(row.doanh_thu);
+    if (row.fresh != null) {
+      const included = !row.fresh || row.thang.slice(0, 7) === monthT;
+      group.value = (group.value ?? 0) + (included ? Number(row.cl_mch3 ?? 0) : 0);
+    }
+    groups.set(key, group);
+  }
+
+  for (const row of rows) {
+    const parent = row.mch2 ?? '';
+    accumulate(departments, parent, { name: parent }, row);
+    accumulate(categories, JSON.stringify([parent, row.mch3]), { name: row.mch3, parent }, row);
+  }
+
+  const sorted = groups => [...groups.values()].sort((a, b) => a.net - b.net || (a.name ?? '').localeCompare(b.name ?? '', 'vi'));
+  return { departments: sorted(departments), categories: sorted(categories) };
+}

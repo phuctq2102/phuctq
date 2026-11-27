@@ -11,7 +11,7 @@ export function saveDashboardSnapshot(root, industry, print = false) {
   clone.querySelectorAll('button, [role="status"]').forEach(el => el.remove());
   const meta = document.createElement('p');
   meta.className = 'dashboard-caption';
-  meta.textContent = `Ngành hàng: ${label} | Sao lưu: ${new Date().toLocaleString('vi-VN')} | MCH2: toàn bộ DSCL`;
+  meta.textContent = `Ngành hàng: ${label} | Sao lưu: ${new Date().toLocaleString('vi-VN')}`;
   clone.querySelector('.dashboard-toolbar > div')?.append(meta);
   const doc = document.implementation.createHTMLDocument('Dashboard kiểm kê');
   doc.documentElement.lang = 'vi';
