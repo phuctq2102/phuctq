@@ -19,7 +19,7 @@ Kiểm tra kỳ bắt đầu ngày 01 của tháng sau kỳ cũ, doanh thu khôn
 ## Phạm vi tiếp theo
 
 - Xác nhận công thức giá trị sau điều chỉnh Final, đối chiếu toàn bộ DSCL với điều chỉnh cuối và chọn quy tắc ghép tháng T với ngày D.
-- Hoàn thiện lưu định mức, nhập GT_HCXL và nhân sự, cùng phần hàng tranh chấp.
+- Hoàn thiện lưu định mức và phần hàng tranh chấp.
 - Nhận biểu mẫu Excel gốc BM8 và WMP BMBG để lập mapping, kiểm tra vùng in và xuất ZIP.
 - Kiểm thử hồi quy V10 bằng tài khoản Admin và nhân viên trên môi trường thử nghiệm.
 
@@ -29,3 +29,10 @@ Kiểm tra kỳ bắt đầu ngày 01 của tháng sau kỳ cũ, doanh thu khôn
 - `src/ClkkReport.jsx` và `src/clkkReport.css` chứa giao diện, lọc đối chiếu, xuất Excel và nháp email.
 - `src/clkkData.js` chuẩn hóa file nhập và tính các chỉ tiêu.
 - `V10_BAO_CAO_CLKK.sql` tạo bảng, RLS và RPC tổng hợp MCH3.
+
+## Nhập các file Excel thực tế
+
+- Lịch kiểm kê nhận cột **Ngày kiểm kê trước** và **Lịch kiểm kê** có năm trong tiêu đề. Khi DSCL chưa có mã SAP, Admin chọn kỳ trong lịch để xem báo cáo SAP độc lập.
+- GT_HCXL đọc số tiền có sẵn và điều kiện đổi trả. Chọn ngày kiểm kê cho từng mã cửa hàng trong file. Khi nhập lại cùng mã và ngày, app thay thế dữ liệu HCXL của kỳ đó.
+- Danh mục nhân sự dùng ba cột **MNV**, **Tên NV**, **CH**. Nhập lại cập nhật theo CH và MNV. Danh mục này phục vụ báo cáo và biên bản, tách khỏi tài khoản đăng nhập.
+- Cài thêm `V10_BAO_CAO_CLKK_DANH_MUC.sql` sau migration CLKK giai đoạn 1 để bật hai phần nhập mới.

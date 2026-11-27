@@ -1,17 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
-import { parseSap, parseSchedule, readClkkFile, summarizeClkk } from './clkkData';
+import { parseHcxl, parseSap, parseSchedule, parseStaff, readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
 import './clkkReport.css';
 
 const vnd = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt = value => value == null ? 'N/A' : vnd.format(value);
+const imports = {
+  schedule: { label: 'Lịch kiểm kê toàn hệ thống', table: 'v10_clkk_lich', key: 'ma_ch,ngay_moi', parse: parseSchedule, unit: 'lịch cửa hàng' },
+  sap: { label: 'Doanh thu và CLKK SAP', table: 'v10_clkk_sap', key: 'ma_ch,thang', parse: parseSap, unit: 'nhóm cửa hàng/tháng' },
+  hcxl: { label: 'Hàng chờ xử lý (HCXL)', table: 'v10_clkk_hcxl', key: 'ma_ch,ngay_moi', parse: parseHcxl, unit: 'cửa hàng' },
+  staff: { label: 'Danh mục nhân sự', table: 'v10_clkk_nhan_su', key: 'ma_ch,mnv', parse: parseStaff, unit: 'nhân viên' },
+};
 const blankFilters = { thang: '', mch2: '', mch3: '' };
 
 export default function ClkkReport() {
   const [stores, setStores] = useState([]);
   const [periods, setPeriods] = useState([]);
+  const [hcxlDates, setHcxlDates] = useState({});
   const [selected, setSelected] = useState('');
   const [draft, setDraft] = useState(null);
   const [report, setReport] = useState(null);
@@ -26,15 +33,17 @@ export default function ClkkReport() {
     const { data: codes, error } = await supabase.rpc('v10_clkk_cua_hang');
     if (error) throw error;
     setStores(codes);
-    if (!codes.length) {
-      setPeriods([]);
-      setSelected('');
-      return;
+    const schedules = [];
+    for (let offset = 0; ; offset += 500) {
+      let query = supabase.from('v10_clkk_lich').select('*').order('ngay_moi', { ascending: false }).order('ma_ch');
+      if (codes.length) query = query.in('ma_ch', codes);
+      const { data, error: scheduleError } = await query.range(offset, offset + 499);
+      if (scheduleError) throw scheduleError;
+      schedules.push(...data);
+      if (data.length < 500) break;
     }
-    const result = await supabase.from('v10_clkk_lich').select('*').in('ma_ch', codes).order('ngay_moi', { ascending: false });
-    if (result.error) throw result.error;
-    setPeriods(result.data);
-    setSelected(codes.length === 1 && result.data.length === 1 ? periodKey(result.data[0]) : '');
+    setPeriods(schedules);
+    setSelected(codes.length === 1 && schedules.length === 1 ? periodKey(schedules[0]) : '');
   }
 
   useEffect(() => {
@@ -57,9 +66,9 @@ export default function ClkkReport() {
     setMessage('');
     setBusy(true);
     try {
-      const schedule = kind === 'schedule';
-      const data = await readClkkFile(file, schedule ? parseSchedule : parseSap);
-      setDraft({ data, schedule, name: file.name });
+      const data = await readClkkFile(file, imports[kind].parse);
+      setHcxlDates({});
+      setDraft({ data, kind, name: file.name });
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -70,15 +79,15 @@ export default function ClkkReport() {
   async function saveUpload() {
     setBusy(true);
     setMessage('');
-    const table = draft.schedule ? 'v10_clkk_lich' : 'v10_clkk_sap';
-    const key = draft.schedule ? 'ma_ch,ngay_moi' : 'ma_ch,thang';
+    const { table, key } = imports[draft.kind];
+    const payload = draft.kind === 'hcxl' ? draft.data.map(row => ({ ...row, ngay_moi: hcxlDates[row.ma_ch] })) : draft.data;
     try {
-      const { error } = await supabase.from(table).upsert(draft.data, { onConflict: key });
+      const { error } = await supabase.from(table).upsert(payload, { onConflict: key });
       if (error) throw error;
       clearReport();
       setDraft(null);
       setConfirmed(false);
-      if (draft.schedule) await loadPeriods();
+      if (draft.kind === 'schedule') await loadPeriods();
       setMessage('Đã lưu dữ liệu.');
     } catch (error) {
       setMessage(error.message);
@@ -100,7 +109,13 @@ export default function ClkkReport() {
         rows.push(...data);
         if (data.length < 500) break;
       }
-      setReport({ rows, calculatedAt: new Date() });
+      const [hcxl, staff] = await Promise.all([
+        supabase.from('v10_clkk_hcxl').select('dong').eq('ma_ch', period.ma_ch).eq('ngay_moi', period.ngay_moi).maybeSingle(),
+        supabase.from('v10_clkk_nhan_su').select('mnv', { count: 'exact', head: true }).eq('ma_ch', period.ma_ch),
+      ]);
+      if (hcxl.error) throw hcxl.error;
+      if (staff.error) throw staff.error;
+      setReport({ rows, hcxl: summarizeHcxl(hcxl.data?.dong), staffCount: staff.count, calculatedAt: new Date() });
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -118,6 +133,9 @@ export default function ClkkReport() {
     ['Tỷ lệ CLKK/DT', summary.ratio, percent],
     ['Giá trị định mức', summary.quota],
     ['Giá trị vượt định mức', summary.excess],
+    ['Tổng giá trị HCXL', report.hcxl?.total],
+    ['HCXL đổi được', report.hcxl?.eligible],
+    ['HCXL không đổi được', report.hcxl?.ineligible],
   ] : [];
   const visibleRows = report?.rows.filter(row => Object.entries(filters).every(([key, value]) => !value || row[key] === value)) ?? [];
   const metadata = Object.entries(period?.thong_tin ?? {});
@@ -167,17 +185,24 @@ export default function ClkkReport() {
     <h2>Báo cáo CLKK và Biên bản</h2>
     {message && <p role="status">{message}</p>}
     <div className="clkk-grid">
-      <label>Lịch kiểm kê toàn hệ thống<input type="file" accept=".xlsx,.xls" disabled={busy} onChange={event => { preview(event.target.files[0], 'schedule'); event.target.value = ''; }}/></label>
-      <label>Doanh thu và CLKK SAP<input type="file" accept=".xlsx,.xls" disabled={busy} onChange={event => { preview(event.target.files[0], 'sap'); event.target.value = ''; }}/></label>
+      {Object.entries(imports).map(([kind, config]) => <label key={kind}>{config.label}
+        <input type="file" accept=".xlsx,.xls" disabled={busy}
+          onChange={event => { preview(event.target.files[0], kind); event.target.value = ''; }}/>
+      </label>)}
     </div>
-    {draft && <p>{draft.name} · {draft.data.length} {draft.schedule ? 'lịch cửa hàng' : 'nhóm cửa hàng/tháng'}.
-      Các khóa trùng sẽ được thay thế. <button type="button" disabled={busy} onClick={saveUpload}>Xác nhận nhập</button>{' '}
+    {draft && <div>
+      <p>{draft.name} · {draft.data.length} {imports[draft.kind].unit}. Các khóa trùng sẽ được cập nhật.</p>
+      {draft.kind === 'hcxl' && <div className="clkk-grid">{draft.data.map(({ ma_ch, dong }) => <label key={ma_ch}>Ngày kiểm kê của {ma_ch} ({dong.length} dòng)
+        <input type="date" required value={hcxlDates[ma_ch] ?? ''}
+          onChange={event => setHcxlDates({ ...hcxlDates, [ma_ch]: event.target.value })}/>
+      </label>)}</div>}
+      <button type="button" disabled={busy || (draft.kind === 'hcxl' && draft.data.some(row => !hcxlDates[row.ma_ch]))} onClick={saveUpload}>Xác nhận nhập</button>{' '}
       <button type="button" disabled={busy} onClick={() => setDraft(null)}>Hủy</button>
-    </p>}
-    <p>Mã SAP từ DSCL: {stores.join(', ') || 'Chưa nhận diện được'}</p>
+    </div>}
+    <p>{stores.length ? `Mã SAP từ DSCL: ${stores.join(', ')}` : 'DSCL chưa có mã SAP. Chọn kỳ trong lịch để xem báo cáo SAP độc lập.'}</p>
     <div className="clkk-grid">
       <label>Kỳ kiểm kê<select value={selected} disabled={busy} onChange={event => { setSelected(event.target.value); setConfirmed(false); clearReport(); }}>
-        <option value="">{periods.length ? 'Chọn kỳ kiểm kê' : 'Chưa có lịch khớp mã SAP'}</option>
+        <option value="">{periods.length ? 'Chọn kỳ kiểm kê' : stores.length ? 'Chưa có lịch khớp mã SAP' : 'Chưa có lịch kiểm kê'}</option>
         {periods.map(row => <option key={periodKey(row)} value={periodKey(row)}>{row.ma_ch} · {row.ngay_cu} → {row.ngay_moi}</option>)}
       </select></label>
       <label>Định mức tạm tính (%)<input type="number" min="0" max="100" step="any" value={rate} onChange={event => { setRate(event.target.value); setEmail(''); }}/></label>
@@ -192,6 +217,9 @@ export default function ClkkReport() {
       {summary.missing.length > 0 && <p className="clkk-warning">Thiếu dữ liệu SAP tháng {summary.missing.join(', ')}.</p>}
       {summary.invalidCategory && <p className="clkk-warning">Có nhóm thiếu MCH2 nên chưa xác định Fresh hoặc không Fresh.</p>}
       {!summary.revenue && <p className="clkk-warning">Doanh thu không Fresh bằng 0 hoặc chưa đủ dữ liệu.</p>}
+      {!report.hcxl && <p>Chưa có HCXL cho cửa hàng và ngày kiểm kê này.</p>}
+      {report.hcxl?.incomplete > 0 && <p className="clkk-warning">HCXL có {report.hcxl.incomplete} dòng thiếu thành tiền hoặc điều kiện đổi trả.</p>}
+      <p>Danh mục nhân sự cửa hàng: {report.staffCount} nhân viên.</p>
       <p>Tính lúc {report.calculatedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })}</p>
       <div className="clkk-grid">{metrics.map(([label, value, format]) => <div className="clkk-metric" key={label}>
         <span>{label}</span><strong className={value < 0 ? 'clkk-negative' : value > 0 ? 'clkk-positive' : ''}>{value == null ? 'N/A' : format ? format.format(value) : fmt(value)}</strong>

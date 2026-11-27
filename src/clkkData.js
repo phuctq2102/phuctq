@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx/xlsx.mjs';
 
 const months = 'JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC'.split(' ');
 const clean = value => String(value ?? '').normalize('NFC').trim();
@@ -6,9 +6,9 @@ const textKey = value => clean(value).toLowerCase().replace(/\s+/g, ' ');
 const store = value => clean(value).toUpperCase();
 const monthKey = (year, month) => `${year}-${String(month).padStart(2, '0')}-01`;
 
-function dateKey(value) {
+function dateKey(value, date1904 = false) {
   if (!clean(value)) return null;
-  const serial = typeof value === 'number' ? XLSX.SSF.parse_date_code(value) : null;
+  const serial = typeof value === 'number' ? XLSX.SSF.parse_date_code(value, { date1904 }) : null;
   const raw = clean(value);
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
   const local = /^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/.exec(raw);
@@ -47,22 +47,22 @@ export function parseSap(rows) {
   return [...batches.values()];
 }
 
-export function parseSchedule(rows) {
+export function parseSchedule(rows, date1904) {
   const aliases = [
     ['mã sap', 'mã sap cửa hàng', 'mã ch', 'ma_ch', 'store'],
     ['ngày kiểm kê cũ', 'ngày kiểm kê trước', 'ngay_kk_cu'],
-    ['ngày kiểm kê mới', 'ngay_kk_moi'],
+    ['ngày kiểm kê mới', 'ngay_kk_moi', /^lịch kiểm kê(?: \d{4})?$/],
   ];
-  const header = rows.findIndex(row => aliases.every(names => row.some(value => names.includes(textKey(value)))));
+  const header = rows.findIndex(row => aliases.every(names => row.some(value => names.some(name => name instanceof RegExp ? name.test(textKey(value)) : name === textKey(value)))));
   if (header < 0) throw new Error('Cần các cột Mã SAP, Ngày kiểm kê cũ và Ngày kiểm kê mới.');
-  const indexes = aliases.map(names => rows[header].findIndex(value => names.includes(textKey(value))));
+  const indexes = aliases.map(names => rows[header].findIndex(value => names.some(name => name instanceof RegExp ? name.test(textKey(value)) : name === textKey(value))));
   const periods = new Map();
   rows.slice(header + 1).forEach((row, index) => {
     if (!row.some(value => clean(value))) return;
     const [code, oldDate, newDate] = indexes.map(i => row[i]);
     const ma_ch = store(code);
-    const ngay_cu = dateKey(oldDate);
-    const ngay_moi = dateKey(newDate);
+    const ngay_cu = dateKey(oldDate, date1904);
+    const ngay_moi = dateKey(newDate, date1904);
     if (!ma_ch || !ngay_cu || !ngay_moi || ngay_cu >= ngay_moi) throw new Error(`Lịch không hợp lệ tại dòng ${header + index + 2}.`);
     const key = `${ma_ch}|${ngay_moi}`;
     if (periods.has(key)) throw new Error(`Lịch trùng trong file tại dòng ${header + index + 2}.`);
@@ -75,7 +75,7 @@ export function parseSchedule(rows) {
 export async function readClkkFile(file, parse) {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: null, blankrows: false });
-  const data = parse(rows);
+  const data = parse(rows, Boolean(workbook.Workbook?.WBProps?.date1904));
   if (!data.length) throw new Error('File không có dữ liệu để nhập.');
   return data;
 }
@@ -105,5 +105,63 @@ export function summarizeClkk(rows, period, rate) {
     fresh: available.has(currentMonth) ? sum(rows.filter(row => row.fresh === true && current(row)), 'cl_mch3') : null,
     ratio: total != null && revenue ? total / revenue : null,
     excess: total == null || quota == null ? null : Math.min(total + quota, 0),
+  };
+}
+
+export function parseHcxl(rows, date1904) {
+  const headers = ['mã ch', 'mã sản phẩm', 'tên sản phẩm', 'hsd (tháng/ngày/năm)', 'thành tiền', 'điều kiện đổi trả (có/không)'];
+  const header = rows.findIndex(row => headers.every(label => row.some(value => textKey(value) === label)));
+  if (header < 0) throw new Error('Không tìm thấy tiêu đề GT_HCXL từ mẫu Excel.');
+  const positions = headers.map(label => rows[header].findIndex(value => textKey(value) === label));
+  const groups = new Map();
+  rows.slice(header + 1).forEach((row, index) => {
+    if (!row.some(value => clean(value))) return;
+    const [code, product, name, expiry, amount, eligibility] = positions.map(i => row[i]);
+    const ma_ch = store(code);
+    const line = header + index + 2;
+    if (!ma_ch || !clean(product)) throw new Error(`Dòng ${line} thiếu mã CH hoặc mã sản phẩm.`);
+    const hsd = dateKey(expiry, date1904);
+    if (!hsd) throw new Error(`Dòng ${line} thiếu HSD hợp lệ.`);
+    const dieu_kien = textKey(eligibility);
+    const dong = { ma_sp: clean(product), ten_sp: clean(name), hsd, thanh_tien: numeric(amount, line),
+      doi_tra: dieu_kien === 'có' ? true : dieu_kien === 'không' ? false : null, goc: row };
+    if (!groups.has(ma_ch)) groups.set(ma_ch, []);
+    groups.get(ma_ch).push(dong);
+  });
+  return Array.from(groups, ([ma_ch, dong]) => ({ ma_ch, dong }));
+}
+
+export function parseStaff(rows) {
+  const headers = ['mnv', 'tên nv', 'ch'];
+  const header = rows.findIndex(row => headers.every(label => row.some(value => textKey(value) === label)));
+  if (header < 0) throw new Error('Cần các cột MNV, Tên NV và CH.');
+  const positions = headers.map(label => rows[header].findIndex(value => textKey(value) === label));
+  const people = new Map();
+  rows.slice(header + 1).forEach((row, index) => {
+    if (!row.some(value => clean(value))) return;
+    const [code, name, location] = positions.map(i => row[i]);
+    const mnv = clean(code);
+    const ten_nv = clean(name);
+    const ma_ch = store(location);
+    const key = JSON.stringify([ma_ch, mnv]);
+    const line = header + index + 2;
+    if (!mnv || !ten_nv || !ma_ch) throw new Error(`Dòng ${line} thiếu MNV, tên hoặc CH.`);
+    if (people.has(key)) throw new Error(`Dòng ${line} trùng mã nhân viên tại cửa hàng.`);
+    people.set(key, { ma_ch, mnv, ten_nv });
+  });
+  return [...people.values()];
+}
+
+export function summarizeHcxl(rows) {
+  if (!rows?.length) return null;
+  const sum = group => group.reduce((total, row) => total + row.thanh_tien, 0);
+  const known = rows.filter(row => row.thanh_tien != null);
+  return {
+    total: known.length === rows.length ? sum(known) : null,
+    eligible: rows.some(row => row.doi_tra == null || (row.doi_tra && row.thanh_tien == null))
+      ? null : sum(known.filter(row => row.doi_tra === true)),
+    ineligible: rows.some(row => row.doi_tra == null || (row.doi_tra === false && row.thanh_tien == null))
+      ? null : sum(known.filter(row => row.doi_tra === false)),
+    incomplete: rows.filter(row => row.thanh_tien == null || row.doi_tra == null).length,
   };
 }
