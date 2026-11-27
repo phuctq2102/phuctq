@@ -1,6 +1,6 @@
 import './utilities.css';
 import { Button } from './components/ui/button';
-import { PackageCheck, LogOut, ListChecks, FileCheck2, Users } from 'lucide-react';
+import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, Users } from 'lucide-react';
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
 import AssignmentTools from './AssignmentTools';
@@ -11,6 +11,7 @@ import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
  { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
+ { id:'phan_cong', label:'Phân công', Icon:ClipboardList, employeeOnly:true },
  { id:'account', label:'Tài khoản & mật khẩu', Icon:Users },
 ];
 const IMPORT_TABLES=[
@@ -108,7 +109,11 @@ async function updateRecoveryPassword(e){
 if(!configured)return <div className="center"><div className="panel"><h2>Chưa cấu hình Supabase</h2><p>Tạo file <code>.env.local</code> theo <code>.env.example</code> rồi chạy lại ứng dụng.</p></div></div>;
 if(recoveryMode)return <div className="center"><form className="panel login" onSubmit={updateRecoveryPassword}><Brand/><h2>Đặt lại mật khẩu</h2><p>{recoveryReady&&session?'Liên kết đã được xác thực. Vui lòng nhập mật khẩu mới.':'Đang xác thực liên kết khôi phục. Nếu không tiếp tục được, hãy yêu cầu email mới.'}</p><label>Mật khẩu mới<input type="password" autoComplete="new-password" minLength={8} value={newPassword} onChange={e=>setNewPassword(e.target.value)} required/></label><label>Xác nhận mật khẩu<input type="password" autoComplete="new-password" minLength={8} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} required/></label><button disabled={busy||!recoveryReady||!session}>{busy?'Đang cập nhật...':'Đổi mật khẩu'}</button>{message&&<p className="error">{message}</p>}</form></div>;
 if(!session)return <div className="center"><form className="panel login" onSubmit={signIn}><Brand/><div className="login-title"><h1>Đăng nhập</h1><p>Nhập mã nhân viên để vào hệ thống kiểm kê.</p></div><label>Mã nhân viên<input type="text" autoComplete="username" maxLength={5} placeholder="ADMIN hoặc 001" value={mnv} onChange={e=>setMnv(e.target.value)} required/></label><label>Mật khẩu<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label><Button type="submit" disabled={busy}>{busy?'Đang đăng nhập…':'Đăng nhập'}</Button>{message&&<p className="error">{message}</p>}</form></div>;
-const pages=PAGES.filter(page=>admin||!page.adminOnly);
+const pages=PAGES.filter(page=>{
+ if(page.adminOnly)return admin;
+ if(page.employeeOnly)return Boolean(profile?.mnv)&&!admin;
+ return true;
+});
 const currentPage=pages.find(page=>page.id===tab)||pages[0];
 return (
  <div className="layout">
@@ -159,11 +164,8 @@ return (
       <AssignmentTools onMessage={setMessage}/>
      </div>
     </details>}
-    {!admin&&profile&&<details className="panel inventory-tools">
-     <summary>Kiểm mã được giao và quét barcode</summary>
-     <div className="inventory-tools-content"><EmployeeCheck profile={profile} onMessage={setMessage}/></div>
-    </details>}
    </>}
+   {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
    {currentPage.id==='final_lines'&&<FinalView/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}
