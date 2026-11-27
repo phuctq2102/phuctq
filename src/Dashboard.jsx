@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { ArrowDownRight, ArrowUpRight, ClipboardList, RefreshCw, FileSpreadsheet } from 'lucide-react';
 import { supabase } from './supabase';
 import { Button } from './components/ui/button';
 import { summarizeInventory } from './dashboardData';
 import './dashboard.css';
+import { saveDashboardSnapshot } from './dashboardSnapshot';
 import { exportDashboard } from './dashboardExport';
 
 const integer = new Intl.NumberFormat('vi-VN');
@@ -58,6 +59,7 @@ function ProductRanking({ title, rows, direction }) {
 }
 
 export default function Dashboard() {
+  const dashboardRef = useRef(null);
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');
   const [refresh, setRefresh] = useState(0);
@@ -96,10 +98,16 @@ export default function Dashboard() {
     catch (err) { setExportError(err.message || 'Không xuất được báo cáo.'); }
   }
 
+  function saveVisual(print) {
+    setExportError('');
+    try { saveDashboardSnapshot(dashboardRef.current, industry, print); }
+    catch (err) { setExportError(err.message); }
+  }
+
   const chartScale = Math.max(1, ...summary?.industries.flatMap(row => [row.positive, -row.negative]) ?? []);
 
 
-  return <div className="dashboard-view" aria-busy={busy}>
+  return <div ref={dashboardRef} className="dashboard-view" aria-busy={busy}>
     <div className="dashboard-toolbar">
       <div><h2><ClipboardList size={20} aria-hidden="true"/> Chênh lệch theo DSCL</h2><p className="dashboard-caption">Giá trị gốc theo Danh sách mã hàng · Đơn vị VNĐ</p></div>
       <div className="dashboard-controls">
@@ -113,6 +121,8 @@ export default function Dashboard() {
         <Button type="button" disabled={busy || !!error || !summary} onClick={downloadReport}>
           <FileSpreadsheet size={16} aria-hidden="true"/> Xuất Excel
         </Button>
+        <Button type="button" variant="outline" disabled={busy || !!error || !summary} onClick={() => saveVisual(false)}>Sao lưu Dashboard</Button>
+        <Button type="button" variant="outline" disabled={busy || !!error || !summary} onClick={() => saveVisual(true)}>In / Lưu PDF</Button>
       </div>
     </div>
     {exportError && <p className="warning" role="alert">{exportError}</p>}
