@@ -187,7 +187,7 @@ tr:hover td { background: #f6f7fd; }
 }
 
 .inv-main-table .inv-name { min-width: 180px; max-width: 340px; overflow-wrap: anywhere; }
-.inv-main-table .inv-material { max-width: 180px; white-space: normal; overflow-wrap: anywhere; }
+.inv-main-table .inv-industry { max-width: 180px; white-space: normal; overflow-wrap: anywhere; }
 .inv-main-table .inv-number { text-align: right; white-space: nowrap; }
 
 .inventory-tools { margin-top: 20px; }
@@ -199,7 +199,7 @@ tr:hover td { background: #f6f7fd; }
 .inventory-tools-content .importpanel-inner p { margin: 0; }
 
 .inv-mobile-label { display: none; }
-.inv-main-table .inv-material { min-width: 108px; }
+.inv-main-table .inv-industry { min-width: 108px; }
 .inventory-page > * { min-width: 0; }
 
 @media (max-width: 760px) {
@@ -267,7 +267,7 @@ tr:hover td { background: #f6f7fd; }
     font-weight: 650;
   }
   .inv-main-table td[data-column="gt_chenh_lech"] { grid-area: 4 / 1 / 5 / 7; }
-  .inv-main-table td:is([data-column="nhom_vat_tu"], [data-column="dvt_co_ban"], [data-column="mnv"]) {
+  .inv-main-table td:is([data-column="nganh_hang"], [data-column="dvt_co_ban"], [data-column="mnv"]) {
     grid-row: 5;
     border-top: 1px solid var(--line);
     padding-top: 8px;
