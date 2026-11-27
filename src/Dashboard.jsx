@@ -7,6 +7,7 @@ import './dashboard.css';
 
 const integer = new Intl.NumberFormat('vi-VN');
 const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 });
+const share = new Intl.NumberFormat('vi-VN', { style: 'percent', maximumFractionDigits: 1 });
 const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
 
 async function readPages(table, fields, key = 'id') {
@@ -18,6 +19,14 @@ async function readPages(table, fields, key = 'id') {
     rows.push(...data);
     if (data.length < pageSize) return rows;
   }
+}
+
+function roundDuration({ count, first, last }) {
+  if (!count) return 'Chưa có dữ liệu';
+  const seconds = Math.floor((last - first) / 1000);
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor(seconds / 60) % 60;
+  return [hours, minutes, seconds % 60].map(value => String(value).padStart(2, '0')).join(':');
 }
 
 function DiscrepancyMetrics({ summary }) {
@@ -69,7 +78,7 @@ export default function Dashboard() {
     Promise.all([
       readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech,sl_dem,sl_so'),
       readPages('v10_nganh_hang', 'ma_nhom,ten_nganh,ma_mch2,ten_mch2', 'ma_nhom'),
-      readPages('ct_kv', 'ma_sp,khu_vuc'),
+      readPages('ct_kv', 'ma_sp,khu_vuc,du_lieu_goc'),
     ]).then(([inventory, catalog, details]) => {
       if (!active) return;
       setSnapshot({ inventory, catalog: new Map(catalog.map(row => [row.ma_nhom, row])), zones: summarizeZones(details) });
@@ -109,11 +118,15 @@ export default function Dashboard() {
       <DiscrepancyMetrics summary={summary}/>
       <section className="panel dashboard-panel">
         <h2>Chênh lệch ròng (netoff) theo MCH2</h2>
-        <p className="dashboard-caption">Tổng lệch âm cộng tổng lệch dương của các mã thuộc từng ngành, trên toàn bộ DSCL.</p>
+        <p className="dashboard-caption">Tỉ trọng = trị tuyệt đối lệch ròng của ngành chia cho tổng trị tuyệt đối lệch ròng các MCH2.</p>
         <div className="dashboard-mch2-list">
           {overview.parents.map(row => <section key={row.code} className="dashboard-mch2-group">
             <h3>{row.name}{row.code && <span>{row.code}</span>}</h3>
-            <DiscrepancyMetrics summary={row}/>
+            <dl>
+              <div><dt>SL mã</dt><dd>{integer.format(row.productCount)}</dd></div>
+              <div><dt>Chênh lệch ròng</dt><dd className={row.net < 0 ? 'negative' : row.net > 0 ? 'positive' : ''}>{money(row.net)}</dd></div>
+              <div><dt>Tỉ trọng</dt><dd>{row.share === null ? '—' : share.format(row.share)}</dd></div>
+            </dl>
           </section>)}
         </div>
         {!overview.parents.length && <p className="empty">Không có dữ liệu DSCL.</p>}
@@ -141,7 +154,7 @@ export default function Dashboard() {
       </div>
       <section className="panel dashboard-panel">
         <div className="dashboard-toolbar">
-          <div><h2><MapPin size={20} aria-hidden="true"/> Kiểm đếm theo khu vực · CTKV</h2><p className="dashboard-caption">Thời lượng mỗi vòng = thời điểm bắn cuối − thời điểm bắn đầu trong cùng khu vực. CTKV chưa có các mốc này.</p></div>
+          <div><h2><MapPin size={20} aria-hidden="true"/> Kiểm đếm theo khu vực · CTKV</h2><p className="dashboard-caption">Thời lượng mỗi vòng = thời điểm bắn cuối − thời điểm bắn đầu trong cùng khu vực.</p></div>
           <label>Khu vực<select value={zone} onChange={event => setZone(event.target.value)}>
             <option value="">Tất cả khu vực</option>
             {snapshot.zones.filter(row => row.zone).map(row => <option key={row.zone}>{row.zone}</option>)}
@@ -149,9 +162,9 @@ export default function Dashboard() {
         </div>
         <div className="tablewrap dashboard-scroll">
           <table>
-            <thead><tr><th scope="col">Khu vực</th><th scope="col">Mã sản phẩm</th><th scope="col">Dòng CTKV</th><th scope="col">Round 1</th><th scope="col">Round 2</th></tr></thead>
+            <thead><tr><th scope="col">Khu vực</th><th scope="col">Mã sản phẩm</th><th scope="col">Dòng CTKV</th><th scope="col">Round 1</th><th scope="col">Round 2</th><th scope="col">Người cập nhật</th></tr></thead>
             <tbody>{snapshot.zones.filter(row => !zone || row.zone === zone).map(row => <tr key={row.zone}>
-              <th scope="row">{row.zone || 'Chưa có khu vực'}</th><td>{integer.format(row.products.size)}</td><td>{integer.format(row.lines)}</td><td>Chưa có dữ liệu</td><td>Chưa có dữ liệu</td>
+              <th scope="row">{row.zone || 'Chưa có khu vực'}</th><td>{integer.format(row.products.size)}</td><td>{integer.format(row.lines)}</td><td>{roundDuration(row.rounds[0])}</td><td>{roundDuration(row.rounds[1])}</td><td className="dashboard-updaters">{[...row.updaters].sort((a,b)=>a.localeCompare(b,'vi')).join(', ') || '—'}</td>
             </tr>)}</tbody>
           </table>
         </div>

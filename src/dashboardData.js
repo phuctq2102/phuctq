@@ -44,13 +44,14 @@ export function summarizeInventory(rows, catalog) {
   }
 
   const ranked = [...products.values()].sort((a, b) => a.value - b.value || a.code.localeCompare(b.code));
+  const totalAbsoluteNet = [...byParent.values()].reduce((total, row) => total + Math.abs(row.net), 0);
   return {
     positive,
     negative,
     productCount: products.size,
     positiveTop: ranked.slice().reverse().filter(row => row.value > 0).slice(0, 10),
     negativeTop: ranked.filter(row => row.value < 0).slice(0, 10),
-    parents: [...byParent.values()].map(({ products, ...parent }) => ({ ...parent, productCount: products.size })).sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
+    parents: [...byParent.values()].map(({ products, ...parent }) => ({ ...parent, productCount: products.size, share: totalAbsoluteNet ? Math.abs(parent.net) / totalAbsoluteNet : null })).sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
     industries: [...byIndustry.values()].map(row => ({ ...row, net: row.positive + row.negative }))
       .sort((a, b) => a.net - b.net || a.code.localeCompare(b.code)),
   };
@@ -60,9 +61,24 @@ export function summarizeZones(rows) {
   const zones = new Map();
   for (const row of rows) {
     const zone = text(row.khu_vuc);
-    if (!zones.has(zone)) zones.set(zone, { zone, lines: 0, products: new Set() });
+    if (!zones.has(zone)) zones.set(zone, {
+      zone, lines: 0, products: new Set(), updaters: new Set(),
+      rounds: [{ count: 0, first: Infinity, last: -Infinity }, { count: 0, first: Infinity, last: -Infinity }],
+    });
     const summary = zones.get(zone);
     summary.lines += 1;
+    const source = row.du_lieu_goc;
+    const updater = text(source?.nguoi_cap_nhat);
+    if (updater) summary.updaters.add(updater);
+    for (const [index, key] of ['round1_at', 'round2_at'].entries()) {
+      const raw = source?.[key];
+      const timestamp = typeof raw === 'string' ? Date.parse(raw) : NaN;
+      if (!Number.isFinite(timestamp)) continue;
+      const round = summary.rounds[index];
+      round.count += 1;
+      round.first = Math.min(round.first, timestamp);
+      round.last = Math.max(round.last, timestamp);
+    }
     const code = text(row.ma_sp);
     if (code) summary.products.add(code);
   }
