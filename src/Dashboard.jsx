@@ -243,17 +243,17 @@ export default function Dashboard() {
     <section className="panel dashboard-panel">
       <h2>Kết quả MCH3 (Cả kỳ)</h2>
       {groups.length ? <>
-        <p className="dashboard-caption">Đang chờ xác nhận cách tách lệch âm, lệch dương và mẫu số tỷ lệ MCH3.</p>
+        <p className="dashboard-caption">Lệch âm và dương cộng từ Netoff MCH3 từng tháng. Tỉ lệ MCH3 = GT MCH3 / doanh thu của nhóm.</p>
         <div className="tablewrap dashboard-scroll">
           <table className="dashboard-mch-table">
             <thead><tr>{['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
             <tbody>{groups.map(row => <tr key={JSON.stringify([row.parent, row.name])}>
               <th scope="row">{row.name}<small>{row.parent}</small></th>
-              <td>—</td>
-              <td>—</td>
+              <td className={tone(row.negative)}>{money(row.negative)}</td>
+              <td className={tone(row.positive)}>{money(row.positive)}</td>
               <td className={tone(row.net)}>{money(row.net)}</td>
               <td className={tone(row.value)}>{row.value == null ? 'N/A' : money(row.value)}</td>
-              <td>—</td>
+              <td className={tone(row.ratio)}>{row.ratio == null ? 'N/A' : percent.format(row.ratio)}</td>
             </tr>)}</tbody>
           </table>
         </div>

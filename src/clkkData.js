@@ -172,8 +172,11 @@ export function summarizePeriodCategories(rows, period) {
   const categories = new Map();
 
   function accumulate(groups, key, fields, row) {
-    const group = groups.get(key) ?? { ...fields, net: 0, value: null, revenue: null };
-    group.net += Number(row.cl_goc ?? 0);
+    const group = groups.get(key) ?? { ...fields, net: 0, negative: 0, positive: 0, value: null, revenue: null };
+    const net = Number(row.cl_goc ?? 0);
+    group.net += net;
+    group.negative += Math.min(net, 0);
+    group.positive += Math.max(net, 0);
     if (row.doanh_thu != null) group.revenue = (group.revenue ?? 0) + Number(row.doanh_thu);
     if (row.fresh != null) {
       const included = !row.fresh || row.thang.slice(0, 7) === monthT;
@@ -189,5 +192,10 @@ export function summarizePeriodCategories(rows, period) {
   }
 
   const sorted = groups => [...groups.values()].sort((a, b) => a.net - b.net || (a.name ?? '').localeCompare(b.name ?? '', 'vi'));
-  return { departments: sorted(departments), categories: sorted(categories) };
+  return {
+    departments: sorted(departments),
+    categories: sorted(categories).map(row => ({
+      ...row, ratio: row.value != null && row.revenue ? row.value / row.revenue : null,
+    })),
+  };
 }
