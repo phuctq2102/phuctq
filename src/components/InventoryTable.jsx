@@ -20,23 +20,27 @@ export function InventoryTable({ rows, columns, page, pageSize, total, busy, set
   return (
     <>
       <div className="tablewrap inv-main-tablewrap" aria-busy={busy}>
-        <table className="inv-main-table">
-          <thead>
+        <table className="inv-main-table" role="table" aria-label="Danh sách mã hàng">
+          <thead role="rowgroup">
             {table.getHeaderGroups().map(group => (
-              <tr key={group.id}>
+              <tr role="row" key={group.id}>
                 {group.headers.map(header => (
-                  <th key={header.id} scope="col" className={header.column.columnDef.meta?.className}>
+                  <th role="columnheader" key={header.id} scope="col" className={header.column.columnDef.meta?.className}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {table.getRowModel().rows.map(row => (
-              <tr key={row.id}>
+              <tr role="row" key={row.id}>
                 {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className={cell.column.columnDef.meta?.className}>
+                  <td role="cell" key={cell.id} data-column={cell.column.id}
+                    className={cell.column.columnDef.meta?.className}>
+                    {cell.column.id !== "detail" && (
+                      <span className="inv-mobile-label" aria-hidden="true">{cell.column.columnDef.header}</span>
+                    )}
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}
