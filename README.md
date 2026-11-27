@@ -48,3 +48,4 @@
 - Bộ lọc trạng thái chỉ lọc 50 mã đã tải. Ngưỡng GT chênh lệch áp dụng phía server, tìm kiếm mã/tên phía server.
 - Chưa kiểm thử npm build do môi trường không cài được dependencies; chạy npm install và npm run build trên máy của bạn để kiểm tra.
 Deploy Web App V10 to Vercel
+Update deployment configuration
