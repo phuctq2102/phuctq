@@ -39,7 +39,7 @@ export default function ClkkReport({ syncRevision = 0 }) {
   }, [syncRevision]);
 
   const period = periods.find(row => periodKey(row) === selected);
-  const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
+  const sameMonth = period?.ngay_cu && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
 
   function clearReport() {
     setReport(null);
@@ -236,17 +236,19 @@ export default function ClkkReport({ syncRevision = 0 }) {
     <div className="clkk-grid">
       <label>Kỳ kiểm kê<select value={selected} disabled={busy} onChange={event => { setSelected(event.target.value); setConfirmed(false); clearReport(); }}>
         <option value="">{periods.length ? 'Chọn kỳ kiểm kê' : stores.length ? 'Chưa có lịch khớp mã SAP' : 'Chưa có lịch kiểm kê'}</option>
-        {periods.map(row => <option key={periodKey(row)} value={periodKey(row)}>{row.ma_ch} · {row.ngay_cu} → {row.ngay_moi}</option>)}
+        {periods.map(row => <option key={periodKey(row)} value={periodKey(row)}>{row.ma_ch} · {row.ngay_cu ?? 'NSO'} → {row.ngay_moi}</option>)}
       </select></label>
       <label>Định mức tạm tính (%)<input type="number" min="0" max="100" step="any" value={rate} onChange={event => { setRate(event.target.value); setEmail(''); }}/></label>
     </div>
     {period && <details><summary>Thông tin lịch cửa hàng</summary><dl>{metadata.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>}
+    {period && !period.ngay_cu && <p className="clkk-warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
     {sameMonth && <label className="clkk-warning"><input type="checkbox" checked={confirmed} onChange={event => { setConfirmed(event.target.checked); clearReport(); }}/> Kỳ cũ và kỳ mới cùng tháng. Xác nhận kỳ để xem trạng thái dữ liệu.</label>}
-    <button type="button" disabled={busy || !period || (sameMonth && !confirmed)} onClick={calculate}>Tính CLKK</button>
+    <button type="button" disabled={busy || !period?.ngay_cu || (sameMonth && !confirmed)} onClick={calculate}>Tính CLKK</button>
     {busy && <p role="status">Đang xử lý…</p>}
     {summary && <>
       <p className="clkk-warning">Bản tính thử với ngày D = 0. Chưa xác nhận dữ liệu SAP tháng T đã cắt đến ngày {period.ngay_moi}.</p>
-      {sameMonth && <p className="clkk-warning">Khoảng tháng theo quy tắc hiện hành rỗng. Cần chốt nghiệp vụ cho kỳ cùng tháng.</p>}
+      {period && !period.ngay_cu && <p className="clkk-warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
+    {sameMonth && <p className="clkk-warning">Khoảng tháng theo quy tắc hiện hành rỗng. Cần chốt nghiệp vụ cho kỳ cùng tháng.</p>}
       {summary.missing.length > 0 && <p className="clkk-warning">Thiếu dữ liệu SAP tháng {summary.missing.join(', ')}.</p>}
       {summary.invalidCategory && <p className="clkk-warning">Có nhóm thiếu MCH2 nên chưa xác định Fresh hoặc không Fresh.</p>}
       {!summary.revenue && <p className="clkk-warning">Doanh thu không Fresh bằng 0 hoặc chưa đủ dữ liệu.</p>}

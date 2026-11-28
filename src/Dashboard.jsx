@@ -15,7 +15,7 @@ const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
 
 const lossRate = 0.003;
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const date = value => value.split('-').reverse().join('/');
+const date = value => value ? value.split('-').reverse().join('/') : 'Chưa có kỳ trước (NSO)';
 const tone = value => value < 0 ? 'negative' : value > 0 ? 'positive' : '';
 
 function Readout({ label, value, format = money }) {
@@ -101,11 +101,11 @@ export default function Dashboard({ syncRevision = 0 }) {
   }, [refresh, syncRevision]);
 
   const period = dates?.schedules.find(row => periodKey(row) === selectedPeriod);
-  const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
+  const sameMonth = Boolean(period?.ngay_cu && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7));
 
   useEffect(() => {
     let active = true;
-    if (!period || sameMonth) return;
+    if (!period?.ngay_cu || sameMonth) return;
     readClkkGroups(period).then(rows => {
       if (active) setPeriodResult({ period, summary: summarizeClkk(rows, period, lossRate), categories: summarizePeriodCategories(rows, period, lossRate) });
     }).catch(error => {
@@ -116,7 +116,7 @@ export default function Dashboard({ syncRevision = 0 }) {
 
   const result = period && periodResult?.period === period ? periodResult : null;
   const totals = result?.summary;
-  const isPeriodLoading = periodsBusy || Boolean(period && !sameMonth && !result);
+  const isPeriodLoading = periodsBusy || Boolean(period?.ngay_cu && !sameMonth && !result);
 
   useEffect(() => {
     let active = true;
@@ -214,6 +214,7 @@ export default function Dashboard({ syncRevision = 0 }) {
       {isPeriodLoading && <p role="status">Đang tải số liệu cả kỳ…</p>}
       {(periodError || result?.error) && <p className="warning" role="alert">Không tải được số liệu cả kỳ. {periodError || result.error}</p>}
       {!period && !isPeriodLoading && !periodError && <p className="empty">{dates?.schedules.length ? 'Chọn kỳ kiểm kê để xem số liệu SAP.' : 'Nhập lịch kiểm kê ở tab Báo cáo CLKK và Biên bản.'}</p>}
+      {period && !period.ngay_cu && <p className="warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
       {sameMonth && <p className="warning">Kỳ cũ và kỳ mới cùng tháng. Cần xác nhận nghiệp vụ trước khi tính.</p>}
       {totals && <>
         <p className="dashboard-caption">Tạm tính với ngày D = 0. Cần xác nhận thời điểm cắt dữ liệu SAP tháng T.</p>

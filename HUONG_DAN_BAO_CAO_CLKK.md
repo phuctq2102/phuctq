@@ -46,3 +46,5 @@ Kiểm tra kỳ bắt đầu ngày 01 của tháng sau kỳ cũ, doanh thu khôn
 5. Sau khi tải lại hoặc đóng tab, chọn lại thư mục để tiếp tục. Khi Reset, app dùng mốc trên Supabase để bỏ qua các file có thời điểm sửa trước Reset. Thay đổi nội dung hoặc thay bằng file mới cho kỳ tiếp theo.
 
 Đồng bộ dùng phiên Admin đang đăng nhập và quyền đọc thư mục được trình duyệt cấp. Web không cần tài khoản Windows hay khóa Supabase quản trị.
+
+Cài `V10_LICH_KK_NSO.sql` sau migration đồng bộ thư mục. Tự động nhập HCXL dựa trên mã SAP và ngày kiểm kê trong file lịch hiện tại của thư mục. Nếu mã không có trong file hoặc xuất hiện ở nhiều kỳ, app đưa mã đó vào danh sách cần kiểm tra. Có thể bỏ file HCXL khi kỳ không phát sinh HCXL. Ngày HSD được giữ theo dòng hàng. Lịch NSO được lưu với ngày kỳ trước để trống; CLKK cả kỳ cần ngày kỳ trước để xác định phạm vi tính. Các dòng có mã placeholder Kho được bỏ qua.

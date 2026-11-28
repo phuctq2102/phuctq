@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import { imports } from './clkkImports';
 import { readClkkFile } from './clkkData';
-import { readClkkSchedules } from './clkkQueries';
 
 export const resetStampKey = 'v10.clkk.folder-reset-at';
 const receiptPrefix = 'v10.clkk.folder-receipt.';
@@ -29,29 +28,31 @@ async function contentHash(bytes) {
   return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-async function syncFile(kind, file, resetAt, cancelled) {
+async function syncFile(kind, file, resetAt, cancelled, activeSchedule, scheduleRows) {
   const config = imports[kind];
   const bytes = await file.arrayBuffer();
   const key = receiptPrefix + kind + '.' + await contentHash(bytes);
   const receipts = JSON.parse(localStorage.getItem(key) ?? '[]');
   if (receipts.includes('*') || cancelled()) return {};
-  const rows = await readClkkFile({ arrayBuffer: async () => bytes }, config.parse);
+  const rows = scheduleRows ?? await readClkkFile({ arrayBuffer: async () => bytes }, config.parse);
   let payload = rows;
   let completed = ['*'];
   let pending = [];
   if (kind === 'hcxl') {
-    const remaining = rows.filter(row => !receipts.includes(row.ma_ch));
-    if (!remaining.length) return {};
-    const periods = new Map(remaining.map(row => [row.ma_ch, []]));
-    const codes = [...periods.keys()];
-    for (let i = 0; i < codes.length; i += 100) {
-      for (const row of await readClkkSchedules(codes.slice(i, i + 100))) periods.get(row.ma_ch)?.push(row.ngay_moi);
+    payload = [];
+    completed = [];
+    for (const row of rows) {
+      const days = activeSchedule.get(row.ma_ch) ?? [];
+      if (days.length !== 1) {
+        pending.push(`${row.ma_ch} ${days.length ? '(nhiều kỳ trong file lịch)' : '(không có trong file lịch)'}`);
+        continue;
+      }
+      const [day] = days;
+      const receipt = `${row.ma_ch}|${day}`;
+      if (receipts.includes(receipt)) continue;
+      payload.push({ ...row, ngay_moi: day });
+      completed.push(receipt);
     }
-    payload = remaining.filter(row => periods.get(row.ma_ch).length === 1)
-      .map(row => ({ ...row, ngay_moi: periods.get(row.ma_ch)[0] }));
-    completed = payload.map(row => row.ma_ch);
-    pending = remaining.filter(row => periods.get(row.ma_ch).length !== 1)
-      .map(row => `${row.ma_ch} ${periods.get(row.ma_ch).length ? '(nhiều kỳ)' : '(thiếu lịch)'}`);
   }
   if (payload.length && !cancelled()) {
     const { error } = await supabase.rpc('v10_clkk_folder_write', {
@@ -84,13 +85,29 @@ export async function syncClkkFolder(directory, cancelled) {
         issues.push(`${entry.name}: ${error.message}`);
       }
     }
-    candidates.sort((a, b) => (a.kind === 'hcxl') - (b.kind === 'hcxl') || a.file.lastModified - b.file.lastModified);
+    candidates.sort((a, b) => a.file.lastModified - b.file.lastModified || a.file.name.localeCompare(b.file.name));
+    const scheduleFile = candidates.filter(item => item.kind === 'schedule').at(-1)?.file;
+    const activeSchedule = new Map();
+    if (scheduleFile && !cancelled()) {
+      try {
+        const scheduleRows = await readClkkFile(scheduleFile, imports.schedule.parse);
+        const result = await syncFile('schedule', scheduleFile, resetAt, cancelled, activeSchedule, scheduleRows);
+        saved += result.saved ?? 0;
+        for (const row of scheduleRows) {
+          if (!activeSchedule.has(row.ma_ch)) activeSchedule.set(row.ma_ch, []);
+          activeSchedule.get(row.ma_ch).push(row.ngay_moi);
+        }
+      } catch (error) {
+        issues.push(`${scheduleFile.name}: ${error.message}`);
+      }
+    }
     for (const { kind, file } of candidates) {
       if (cancelled()) break;
+      if (kind === 'schedule') continue;
       try {
-        const result = await syncFile(kind, file, resetAt, cancelled);
+        const result = await syncFile(kind, file, resetAt, cancelled, activeSchedule);
         saved += result.saved ?? 0;
-        if (result.pending?.length) issues.push(`${file.name}: ${result.pending.join(', ')}. Xử lý trong mục nhập HCXL.`);
+        if (result.pending?.length) issues.push(`${file.name}: ${result.pending.join(', ')}. Kiểm tra Lịch KK.xlsx.`);
       } catch (error) {
         issues.push(`${file.name}: ${error.message}`);
       }

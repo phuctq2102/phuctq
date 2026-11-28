@@ -61,9 +61,16 @@ export function parseSchedule(rows, date1904) {
     if (!row.some(value => clean(value))) return;
     const [code, oldDate, newDate] = indexes.map(i => row[i]);
     const ma_ch = store(code);
-    const ngay_cu = dateKey(oldDate, date1904);
+    if (ma_ch === 'KHO') return; // Nhãn kho trong lịch, không phải mã SAP cửa hàng.
+    const firstCount = store(oldDate) === 'NSO';
+    const ngay_cu = firstCount ? null : dateKey(oldDate, date1904);
     const ngay_moi = dateKey(newDate, date1904);
-    if (!ma_ch || !ngay_cu || !ngay_moi || ngay_cu >= ngay_moi) throw new Error(`Lịch không hợp lệ tại dòng ${header + index + 2}.`);
+    const line = header + index + 2;
+    if (!ma_ch) throw new Error(`Dòng ${line} thiếu mã SAP.`);
+    if (!ngay_moi) throw new Error(`Ngày kiểm kê mới không hợp lệ tại dòng ${line} (${ma_ch}).`);
+    if ((!firstCount && !ngay_cu) || (ngay_cu && ngay_cu >= ngay_moi)) {
+      throw new Error(`Ngày kiểm kê trước không hợp lệ tại dòng ${line} (${ma_ch}).`);
+    }
     const key = `${ma_ch}|${ngay_moi}`;
     if (periods.has(key)) throw new Error(`Lịch trùng trong file tại dòng ${header + index + 2}.`);
     const thong_tin = Object.fromEntries(rows[header].flatMap((label, i) => clean(label) && clean(row[i]) ? [[clean(label), clean(row[i])]] : []));
