@@ -10,6 +10,7 @@ import Accounts from './Accounts';
 import EmployeeCheck from './EmployeeCheck';
 import FinalView from './FinalView';
 import ClkkReport from './ClkkReport';
+import ClkkFolderSync from './ClkkFolderSync';
 import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
@@ -58,6 +59,8 @@ function PasswordManager({profile,onMessage}){
 }
 
 function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[inventoryRevision,setInventoryRevision]=useState(0),[importTable,setImportTable]=useState('dscl'),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
+ const [syncRevision,setSyncRevision]=useState(0);
+ const [resetRevision,setResetRevision]=useState(0);
 useEffect(()=>{
  if(!supabase)return;
  let active=true;
@@ -166,18 +169,19 @@ return (
        {uploadBusy&&<p role="status">Đang xử lý…</p>}
       </section>
       <IndustryImport onSaved={()=>setInventoryRevision(value=>value+1)}/>
-      <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setUpload(null)}}/>
+      <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setResetRevision(value=>value+1);setUpload(null)}}/>
       <AssignmentTools onMessage={setMessage}/>
      </div>
     </details>}
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
-   {currentPage.id==='dashboard'&&<Dashboard/>}
+   {admin&&<ClkkFolderSync visible={currentPage.id==='clkk'} resetRevision={resetRevision} onSaved={()=>setSyncRevision(value=>value+1)}/>}
+   {currentPage.id==='dashboard'&&<Dashboard syncRevision={syncRevision}/>}
    {currentPage.id==='final_lines'&&<>
     <Button type="button" variant="outline" onClick={()=>setTab('clkk')}>Mở báo cáo CLKK của kỳ</Button>
     <FinalView/>
    </>}
-   {currentPage.id==='clkk'&&<ClkkReport/>}
+   {currentPage.id==='clkk'&&<ClkkReport syncRevision={syncRevision}/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}
     <PasswordManager profile={profile} onMessage={setMessage}/>

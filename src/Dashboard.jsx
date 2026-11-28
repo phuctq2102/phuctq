@@ -68,7 +68,7 @@ function ProductRanking({ title, rows, direction }) {
   </section>;
 }
 
-export default function Dashboard() {
+export default function Dashboard({ syncRevision = 0 }) {
   const dashboardRef = useRef(null);
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');
@@ -98,7 +98,7 @@ export default function Dashboard() {
       if (active) setPeriodsBusy(false);
     });
     return () => { active = false; };
-  }, [refresh]);
+  }, [refresh, syncRevision]);
 
   const period = dates?.schedules.find(row => periodKey(row) === selectedPeriod);
   const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);
@@ -134,7 +134,7 @@ export default function Dashboard() {
       if (active) setBusy(false);
     });
     return () => { active = false; };
-  }, [refresh]);
+  }, [refresh, syncRevision]);
 
   const overview = useMemo(() => snapshot && summarizeInventory(snapshot.inventory, snapshot.catalog), [snapshot]);
   const summary = useMemo(() => {

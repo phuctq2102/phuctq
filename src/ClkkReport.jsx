@@ -1,23 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
-import { parseHcxl, parseSap, parseSchedule, parseStaff, readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
+import { readClkkFile, summarizeClkk, summarizeHcxl } from './clkkData';
 import './clkkReport.css';
+import { imports } from './clkkImports';
 import Bm8Notes from './Bm8Notes';
 import { periodKey, readClkkGroups, readClkkPeriods, readClkkSchedules } from './clkkQueries';
 
 const vnd = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 0 });
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmt = value => value == null ? 'N/A' : vnd.format(value);
-const imports = {
-  schedule: { label: 'Lịch kiểm kê toàn hệ thống', table: 'v10_clkk_lich', key: 'ma_ch,ngay_moi', parse: parseSchedule, unit: 'lịch cửa hàng' },
-  sap: { label: 'Doanh thu và CLKK SAP', table: 'v10_clkk_sap', key: 'ma_ch,thang', parse: parseSap, unit: 'nhóm cửa hàng/tháng' },
-  hcxl: { label: 'Hàng chờ xử lý (HCXL)', table: 'v10_clkk_hcxl', key: 'ma_ch,ngay_moi', parse: parseHcxl, unit: 'cửa hàng' },
-  staff: { label: 'Danh mục nhân sự', table: 'v10_clkk_nhan_su', key: 'ma_ch,mnv', parse: parseStaff, unit: 'nhân viên' },
-};
 const blankFilters = { thang: '', mch2: '', mch3: '' };
 
-export default function ClkkReport() {
+export default function ClkkReport({ syncRevision = 0 }) {
   const [stores, setStores] = useState([]);
   const [periods, setPeriods] = useState([]);
   const [hcxlDates, setHcxlDates] = useState({});
@@ -35,12 +30,13 @@ export default function ClkkReport() {
     const { codes, schedules } = await readClkkPeriods();
     setStores(codes);
     setPeriods(schedules);
-    setSelected(codes.length === 1 && schedules.length === 1 ? periodKey(schedules[0]) : '');
+    setSelected(previous => schedules.some(row => periodKey(row) === previous) ? previous : codes.length === 1 && schedules.length === 1 ? periodKey(schedules[0]) : '');
   }
 
   useEffect(() => {
+    clearReport();
     loadPeriods().catch(error => setMessage(error.message)).finally(() => setBusy(false));
-  }, []);
+  }, [syncRevision]);
 
   const period = periods.find(row => periodKey(row) === selected);
   const sameMonth = period && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7);

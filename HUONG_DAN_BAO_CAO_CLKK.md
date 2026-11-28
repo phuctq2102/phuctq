@@ -36,3 +36,13 @@ Kiểm tra kỳ bắt đầu ngày 01 của tháng sau kỳ cũ, doanh thu khôn
 - GT_HCXL đọc số tiền có sẵn và điều kiện đổi trả. App tra lịch theo từng mã cửa hàng trong file. Khi có một lịch khớp, app điền ngày tự động. Khi có nhiều lịch, Admin chọn kỳ. Có thể nhập riêng từng cửa hàng hoặc nhập chung các cửa hàng đã có kỳ. Các cửa hàng thiếu lịch vẫn còn trong bản xem trước khi nhập lịch bổ sung. Khi nhập lại cùng mã và ngày, app thay thế dữ liệu HCXL của kỳ đó.
 - Danh mục nhân sự dùng ba cột **MNV**, **Tên NV**, **CH**. Nhập lại cập nhật theo CH và MNV. Danh mục này phục vụ báo cáo và biên bản, tách khỏi tài khoản đăng nhập.
 - Cài thêm `V10_BAO_CAO_CLKK_DANH_MUC.sql` sau migration CLKK giai đoạn 1 để bật hai phần nhập mới. Cài `V10_RESET_GIU_BC.sql` sau RPC Reset gốc; SQL cài đặt chỉ đăng ký RPC có xác nhận, xóa dữ liệu diễn ra khi Admin thực hiện Reset.
+
+## Đồng bộ thư mục Excel trên máy
+
+1. Cài `V10_DONG_BO_THU_MUC.sql` sau các migration báo cáo và Reset. Migration này chỉ cài chức năng, việc xóa dữ liệu vẫn cần Admin xác nhận Reset trong ứng dụng.
+2. Mở **Báo cáo CLKK và Biên bản** bằng Chrome hoặc Edge trên máy tính. Chọn **Chọn thư mục đồng bộ** rồi cấp quyền đọc thư mục Excel. Thư mục phải chứa file trực tiếp.
+3. Dùng các tên **Lịch KK.xlsx**, **Up file trc và trong tháng KK.xlsx**, **HCXL.xlsx**, **DS nhan su.xlsx**. File cũng có thể dùng tên **Lịch kiểm kê**, **Doanh thu và CLKK SAP**, **GT_HCXL** hoặc **Danh mục nhân sự** với đuôi Excel tương ứng.
+4. Giữ tab V10 mở. Dashboard tự tải lại sau khi có dữ liệu mới. HCXL tự lưu các cửa hàng có đúng một lịch. Nếu thiếu lịch, nhập lịch tương ứng. Nếu có nhiều kỳ, chọn kỳ trong luồng nhập HCXL.
+5. Sau khi tải lại hoặc đóng tab, chọn lại thư mục để tiếp tục. Khi Reset, app dùng mốc trên Supabase để bỏ qua các file có thời điểm sửa trước Reset. Thay đổi nội dung hoặc thay bằng file mới cho kỳ tiếp theo.
+
+Đồng bộ dùng phiên Admin đang đăng nhập và quyền đọc thư mục được trình duyệt cấp. Web không cần tài khoản Windows hay khóa Supabase quản trị.

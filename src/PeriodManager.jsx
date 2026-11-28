@@ -1,5 +1,6 @@
 import React,{useState} from 'react';
 import {supabase} from './supabase';
+import {resetStampKey,withFolderWriteLock} from './clkkFolderSync';
 export default function PeriodManager({admin,onMessage,onNewPeriod}) {
  const [confirming,setConfirming]=useState(false);
  const [phrase,setPhrase]=useState('');
@@ -8,11 +9,15 @@ export default function PeriodManager({admin,onMessage,onNewPeriod}) {
   if(!admin||busy||phrase.trim()!=='RESET')return;
   setBusy(true);
   try{
-   const {data,error}=await supabase.rpc('v10_reset_ky_kiem_ke',{p_confirmation:phrase.trim()});
-   if(error)throw error;
-   if(data!==true)throw Error('Supabase không xác nhận Reset thành công.');
-   setConfirming(false);setPhrase('');
-   onNewPeriod?.();
+   await withFolderWriteLock(async()=>{
+    const {data,error}=await supabase.rpc('v10_reset_ky_kiem_ke',{p_confirmation:phrase.trim()});
+    if(error)throw error;
+    if(data!==true)throw Error('Supabase không xác nhận Reset thành công.');
+    try { localStorage.setItem(resetStampKey,String(Date.now())); }
+    catch { /* Reset is already committed. */ }
+    setConfirming(false);setPhrase('');
+    onNewPeriod?.();
+   });
    onMessage?.('Đã xóa dữ liệu kiểm kê trên Supabase. Dữ liệu BC vẫn còn.');
   }catch(e){onMessage?.('Reset KHÔNG thành công: '+e.message)}finally{setBusy(false)}
  }
