@@ -136,7 +136,7 @@ export default function ClkkReport({ syncRevision = 0 }) {
         supabase.from('v10_clkk_nhan_su').select('mnv', { count: 'exact', head: true }).eq('ma_ch', period.ma_ch),
       ]);
       if (staff.error) throw staff.error;
-      setReport({ rows, hcxl: summarizeHcxl(hcxl.data?.dong), hcxlError: Boolean(hcxl.error), staffCount: staff.count, calculatedAt: new Date() });
+      setReport({ rows, hcxl: summarizeHcxl(hcxl.data?.dong, period.ngay_moi), hcxlError: Boolean(hcxl.error), staffCount: staff.count, calculatedAt: new Date() });
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -166,14 +166,22 @@ export default function ClkkReport({ syncRevision = 0 }) {
     try {
       const wb = XLSX.utils.book_new();
       const append = (name, rows) => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
-      const [year, month] = period.ngay_cu.split('-').map(Number);
-      const start = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
-      const { data, error } = await supabase.from('v10_clkk_sap').select('dong')
-        .eq('ma_ch', period.ma_ch).gte('thang', start).lte('thang', period.ngay_moi).order('thang');
+      let sapQuery = supabase.from('v10_clkk_sap').select('dong')
+        .eq('ma_ch', period.ma_ch).lte('thang', period.ngay_moi).order('thang');
+      if (period.ngay_cu) {
+        const [year, month] = period.ngay_cu.split('-').map(Number);
+        const start = new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+        sapQuery = sapQuery.gte('thang', start);
+      }
+      const { data, error } = await sapQuery;
       if (error) throw error;
       append('Bao cao', [['Mã SAP', period.ma_ch], ['Ngày kiểm kê', period.ngay_moi], ['Ngày D', 'Tạm tính 0'], ['Thời điểm cắt dữ liệu tháng T', 'Chưa xác nhận'], ...metrics.map(([label, value, format]) => [label, value == null ? 'N/A' : format ? format.format(value) : value])]);
       append('MCH3', [['Tháng', 'MCH2', 'MCH3', 'CL gốc', 'CL MCH3', 'Doanh thu'], ...report.rows.map(row => [row.thang, row.mch2, row.mch3, row.cl_goc, row.cl_mch3, row.doanh_thu])]);
       append('SAP goc', [['Store', 'Tên cửa hàng', 'MCH2', 'MCH3', 'Calendar Year/Month', 'Physical Inventory Var. Value VND', 'Revenue'], ...data.flatMap(batch => batch.dong.map(row => row.goc))]);
+      if (report.hcxl) append('HCXL', [
+        ['HSD tại ngày kiểm kê', 'Giá trị', 'Đổi trả được', 'Không đổi trả', 'Chưa rõ đổi trả'],
+        ...report.hcxl.buckets.map(row => [row.label, row.total, row.eligible, row.ineligible, row.undecided]),
+      ]);
       XLSX.writeFile(wb, `Bao_cao_CLKK_${period.ma_ch}_${period.ngay_moi}.xlsx`);
     } catch (error) {
       setMessage(error.message);
@@ -243,13 +251,12 @@ export default function ClkkReport({ syncRevision = 0 }) {
       <label>Định mức tạm tính (%)<input type="number" min="0" max="100" step="any" value={rate} onChange={event => { setRate(event.target.value); setEmail(''); }}/></label>
     </div>
     {period && <details><summary>Thông tin lịch cửa hàng</summary><dl>{metadata.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl></details>}
-    {period && !period.ngay_cu && <p className="clkk-warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
+    {period && !period.ngay_cu && <p className="clkk-warning">Kỳ đầu NSO · Tính từ tháng SAP đầu tiên có dữ liệu.</p>}
     {sameMonth && <label className="clkk-warning"><input type="checkbox" checked={confirmed} onChange={event => { setConfirmed(event.target.checked); clearReport(); }}/> Kỳ cũ và kỳ mới cùng tháng. Xác nhận kỳ để xem trạng thái dữ liệu.</label>}
-    <button type="button" disabled={busy || !period?.ngay_cu || (sameMonth && !confirmed)} onClick={calculate}>Tính CLKK</button>
+    <button type="button" disabled={busy || !period || (sameMonth && !confirmed)} onClick={calculate}>Tính CLKK</button>
     {busy && <p role="status">Đang xử lý…</p>}
     {summary && <>
       <p className="clkk-warning">Bản tính thử với ngày D = 0. Chưa xác nhận dữ liệu SAP tháng T đã cắt đến ngày {period.ngay_moi}.</p>
-      {period && !period.ngay_cu && <p className="clkk-warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
     {sameMonth && <p className="clkk-warning">Khoảng tháng theo quy tắc hiện hành rỗng. Cần chốt nghiệp vụ cho kỳ cùng tháng.</p>}
       {summary.missing.length > 0 && <p className="clkk-warning">Thiếu dữ liệu SAP tháng {summary.missing.join(', ')}.</p>}
       {summary.invalidCategory && <p className="clkk-warning">Có nhóm thiếu MCH2 nên chưa xác định Fresh hoặc không Fresh.</p>}
@@ -262,6 +269,16 @@ export default function ClkkReport({ syncRevision = 0 }) {
       <div className="clkk-grid">{metrics.map(([label, value, format]) => <div className="clkk-metric" key={label}>
         <span>{label}</span><strong className={value < 0 ? 'clkk-negative' : value > 0 ? 'clkk-positive' : ''}>{value == null ? 'N/A' : format ? format.format(value) : fmt(value)}</strong>
       </div>)}</div>
+      {report.hcxl && <section>
+        <h3>Giá trị HCXL theo HSD tại ngày kiểm kê</h3>
+        <div className="tablewrap"><table>
+          <thead><tr>{['HSD', 'Giá trị', 'Đổi trả được', 'Không đổi trả', 'Chưa rõ đổi trả'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+          <tbody>{report.hcxl.buckets.filter(row => row.count > 0).map(row => <tr key={row.label}>
+            <th scope="row">{row.label}</th><td>{fmt(row.total)}</td><td>{fmt(row.eligible)}</td><td>{fmt(row.ineligible)}</td><td>{fmt(row.undecided)}</td>
+          </tr>)}</tbody>
+          <tfoot><tr><th scope="row">Tổng</th><td>{fmt(report.hcxl.total)}</td><td>{fmt(report.hcxl.eligible)}</td><td>{fmt(report.hcxl.ineligible)}</td><td>{fmt(report.hcxl.undecided)}</td></tr></tfoot>
+        </table></div>
+      </section>}
       <details><summary>Chi tiết đối chiếu MCH3</summary>
         <div className="clkk-grid">{Object.entries({ thang: 'Tháng', mch2: 'MCH2', mch3: 'MCH3' }).map(([key, label]) => <label key={key}>{label}
           <select value={filters[key]} onChange={event => setFilters({ ...filters, [key]: event.target.value })}>

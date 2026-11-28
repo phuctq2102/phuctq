@@ -6,6 +6,7 @@ import { summarizeInventory } from './dashboardData';
 import { summarizeClkk, summarizePeriodCategories } from './clkkData';
 import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
 import './dashboard.css';
+import GdvDashboard from './GdvDashboard';
 import { saveDashboardSnapshot } from './dashboardSnapshot';
 import { exportDashboard } from './dashboardExport';
 
@@ -15,7 +16,7 @@ const money = value => currency.format(Math.abs(value) < 0.5 ? 0 : value);
 
 const lossRate = 0.003;
 const percent = new Intl.NumberFormat('vi-VN', { style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const date = value => value ? value.split('-').reverse().join('/') : 'Chưa có kỳ trước (NSO)';
+const date = value => value ? value.split('-').reverse().join('/') : 'NSO · Từ tháng SAP đầu tiên';
 const tone = value => value < 0 ? 'negative' : value > 0 ? 'positive' : '';
 
 function Readout({ label, value, format = money }) {
@@ -69,6 +70,17 @@ function ProductRanking({ title, rows, direction }) {
 }
 
 export default function Dashboard({ syncRevision = 0 }) {
+  const [view, setView] = useState('store');
+  return <>
+    <nav className="dashboard-controls dashboard-view-switch" aria-label="Phạm vi Dashboard">
+      <Button type="button" variant={view === 'store' ? 'default' : 'outline'} aria-pressed={view === 'store'} onClick={() => setView('store')}>Theo cửa hàng</Button>
+      <Button type="button" variant={view === 'gdv' ? 'default' : 'outline'} aria-pressed={view === 'gdv'} onClick={() => setView('gdv')}>Theo GĐV</Button>
+    </nav>
+    {view === 'gdv' ? <GdvDashboard syncRevision={syncRevision}/> : <StoreDashboard syncRevision={syncRevision}/>}
+  </>;
+}
+
+function StoreDashboard({ syncRevision }) {
   const dashboardRef = useRef(null);
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');
@@ -105,7 +117,7 @@ export default function Dashboard({ syncRevision = 0 }) {
 
   useEffect(() => {
     let active = true;
-    if (!period?.ngay_cu || sameMonth) return;
+    if (!period || sameMonth) return;
     readClkkGroups(period).then(rows => {
       if (active) setPeriodResult({ period, summary: summarizeClkk(rows, period, lossRate), categories: summarizePeriodCategories(rows, period, lossRate) });
     }).catch(error => {
@@ -116,7 +128,7 @@ export default function Dashboard({ syncRevision = 0 }) {
 
   const result = period && periodResult?.period === period ? periodResult : null;
   const totals = result?.summary;
-  const isPeriodLoading = periodsBusy || Boolean(period?.ngay_cu && !sameMonth && !result);
+  const isPeriodLoading = periodsBusy || Boolean(period && !sameMonth && !result);
 
   useEffect(() => {
     let active = true;
@@ -214,7 +226,7 @@ export default function Dashboard({ syncRevision = 0 }) {
       {isPeriodLoading && <p role="status">Đang tải số liệu cả kỳ…</p>}
       {(periodError || result?.error) && <p className="warning" role="alert">Không tải được số liệu cả kỳ. {periodError || result.error}</p>}
       {!period && !isPeriodLoading && !periodError && <p className="empty">{dates?.schedules.length ? 'Chọn kỳ kiểm kê để xem số liệu SAP.' : 'Nhập lịch kiểm kê ở tab Báo cáo CLKK và Biên bản.'}</p>}
-      {period && !period.ngay_cu && <p className="warning">Lịch ghi NSO. Chưa có kỳ trước để xác định số liệu CLKK cả kỳ.</p>}
+      {period && !period.ngay_cu && <p className="warning">Kỳ đầu NSO · Tính từ tháng SAP đầu tiên có dữ liệu.</p>}
       {sameMonth && <p className="warning">Kỳ cũ và kỳ mới cùng tháng. Cần xác nhận nghiệp vụ trước khi tính.</p>}
       {totals && <>
         <p className="dashboard-caption">Tạm tính với ngày D = 0. Cần xác nhận thời điểm cắt dữ liệu SAP tháng T.</p>

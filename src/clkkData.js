@@ -62,7 +62,7 @@ export function parseSchedule(rows, date1904) {
     const [code, oldDate, newDate] = indexes.map(i => row[i]);
     const ma_ch = store(code);
     if (ma_ch === 'KHO') return; // Nhãn kho trong lịch, không phải mã SAP cửa hàng.
-    const firstCount = store(oldDate) === 'NSO';
+    const firstCount = store(oldDate) === 'NSO' || oldDate === 0 || /^0{1,2}[/.\-]0{1,2}[/.\-]1900$/.test(clean(oldDate));
     const ngay_cu = firstCount ? null : dateKey(oldDate, date1904);
     const ngay_moi = dateKey(newDate, date1904);
     const line = header + index + 2;
@@ -89,9 +89,10 @@ export async function readClkkFile(file, parse, { allowEmpty = false } = {}) {
 
 export function summarizeClkk(rows, period, rate) {
   const currentMonth = period.ngay_moi.slice(0, 7);
-  const [year, month] = period.ngay_cu.slice(0, 7).split('-').map(Number);
-  const cursor = new Date(Date.UTC(year, month, 1));
   const available = new Set(rows.map(row => row.thang.slice(0, 7)));
+  const firstAvailable = [...available].sort()[0] ?? currentMonth;
+  const [year, month] = (period.ngay_cu?.slice(0, 7) ?? firstAvailable).split('-').map(Number);
+  const cursor = new Date(Date.UTC(year, period.ngay_cu ? month : month - 1, 1));
   const missing = [];
   while (cursor.toISOString().slice(0, 7) <= currentMonth) {
     const key = cursor.toISOString().slice(0, 7);
@@ -158,13 +159,30 @@ export function parseStaff(rows) {
   return [...people.values()];
 }
 
-export function summarizeHcxl(rows) {
+export function summarizeHcxl(rows, inventoryDate) {
   if (!rows?.length) return null;
-  const known = rows.filter(row => Number.isFinite(row.thanh_tien));
-  return {
-    total: known.length === rows.length ? known.reduce((total, row) => total + row.thanh_tien, 0) : null,
-    incomplete: rows.length - known.length,
-  };
+  const inventoryTime = Date.parse(inventoryDate);
+  const buckets = ['Đã hết hạn', 'Còn 0–90 ngày', 'Còn trên 90 ngày', 'Chưa rõ HSD'].map(label => ({
+    label, total: 0, eligible: 0, ineligible: 0, undecided: 0, count: 0,
+  }));
+  let incomplete = 0;
+  for (const row of rows) {
+    const days = (Date.parse(row.hsd) - inventoryTime) / 86400000;
+    const index = !Number.isFinite(days) ? 3 : days < 0 ? 0 : days <= 90 ? 1 : 2;
+    const bucket = buckets[index];
+    bucket.count += 1;
+    if (!Number.isFinite(row.thanh_tien)) {
+      incomplete += 1;
+      continue;
+    }
+    bucket.total += row.thanh_tien;
+    const field = row.doi_tra === true ? 'eligible' : row.doi_tra === false ? 'ineligible' : 'undecided';
+    bucket[field] += row.thanh_tien;
+  }
+  const totals = Object.fromEntries(['total','eligible','ineligible','undecided'].map(key => [
+    key, buckets.reduce((sum, bucket) => sum + bucket[key], 0),
+  ]));
+  return { ...totals, total: incomplete ? null : totals.total, buckets, incomplete };
 }
 
 export function summarizePeriodCategories(rows, period, rate) {
