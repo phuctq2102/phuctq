@@ -68,3 +68,47 @@
 .dashboard-product-card .dashboard-quantities dt { color:#475569; }
 .dashboard-product-card .dashboard-quantities dd.negative { color:#b42336; }
 .dashboard-product-card .dashboard-quantities dd.positive { color:#08734f; }
+
+.dashboard-hero {
+  display: grid;
+  gap: 23px;
+  padding: clamp(18px, 3vw, 34px);
+  border-radius: 22px;
+  color: #fff;
+  background: radial-gradient(ellipse at 100% 0%, #554bb1, transparent 60%), #211d49;
+  box-shadow: 0 12px 24px #24204f25;
+}
+.dashboard-hero-header, .dashboard-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.dashboard-hero h2 { font-size: clamp(1.65rem, 3vw, 2.5rem); color: #fff; letter-spacing: -.035em; }
+.dashboard-period-context { display: flex; align-items: center; gap: 7px; margin: 8px 0 0; color: #e0ddff; }
+.dashboard-period-picker { display: grid; gap: 5px; color: #e0ddff; font-size: .875rem; min-width: min(100%, 12rem); max-width: 100%; }
+.dashboard-period-picker select { color: #25214b; background: #fff; max-width: 100%; }
+.dashboard-primary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.dashboard-primary > div { display: grid; gap: 13px; align-content: start; padding: clamp(12px, 2vw, 20px); border: 1px solid #c5bbff48; border-radius: 14px; background: #fff1; min-width: 0; }
+.dashboard-primary svg { color: #d9d1ff; }
+.dashboard-primary small, .dashboard-primary strong { display: block; }
+.dashboard-primary small { color: #e5e0ff; font-weight: 550; }
+.dashboard-primary strong { margin-top: 5px; font-size: clamp(1.25rem, 2.4vw, 2.1rem); line-height: 1.14; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dashboard-primary strong.negative { color: #ffbfc8; }
+.dashboard-primary strong.positive { color: #a8f4d4; }
+.dashboard-primary > div:nth-child(2) strong { color: #fff; }
+.dashboard-panel .dashboard-kpis { margin: 0; }
+.dashboard-product-section { display: grid; gap: 13px; }
+.dashboard-product-section > h2 { margin-inline: 2px; }
+.dashboard-period-results .warning { margin: 0; }
+@media (max-width: 1150px) {
+  .dashboard-primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .dashboard-primary { grid-template-columns: 1fr; }
+  .dashboard-primary > div { grid-template-columns: 23px minmax(0, 1fr); align-items: center; gap: 12px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dashboard-bar span { transition: width .2s ease; }
+}

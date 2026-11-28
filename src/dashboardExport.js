@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 
-export function buildDashboardWorkbook({ inventory, catalog, summary, overview, industry, now = new Date() }) {
+export function buildDashboardWorkbook({ inventory, catalog, summary, overview, industry, period, totals, periodCategories, now = new Date() }) {
   const wb = XLSX.utils.book_new();
   const money = '#,##0;[Red]-#,##0;0';
   const qty = '#,##0.###;[Red]-#,##0.###;0';
@@ -20,6 +20,31 @@ export function buildDashboardWorkbook({ inventory, catalog, summary, overview, 
     ['MCH2', 'Toàn bộ DSCL (giống Dashboard)'], ['Tổng mã sản phẩm', summary.productCount],
     ['Tổng lệch âm', summary.negative], ['Tổng lệch dương', summary.positive], ['Chênh lệch ròng', summary.positive + summary.negative]
   ], [30, 52], {1: money});
+  if (period && totals) {
+    add('CLKK ca ky', ['Chỉ tiêu', 'Giá trị'], [
+      ['Mã SAP', period.ma_ch],
+      ['Ngày kiểm kê', period.ngay_moi],
+      ['Nguồn', 'SAP · Ngày D tạm tính 0'],
+      ['Thời điểm cắt dữ liệu SAP tháng T', 'Chưa xác nhận'],
+      ['Tháng thiếu dữ liệu', totals.missing.join(', ')],
+      ['MCH2 chưa phân loại', totals.invalidCategory ? 'Có' : 'Không'],
+      ['Doanh thu không Fresh', totals.revenue ?? 'N/A'],
+      ['CLKK không Fresh', totals.total ?? 'N/A'],
+      ['Tỷ lệ CLKK / doanh thu', totals.ratio == null ? 'N/A' : new Intl.NumberFormat('vi-VN', {style: 'percent', minimumFractionDigits: 2, maximumFractionDigits: 2}).format(totals.ratio)],
+      ['CL không Fresh trước tháng T', totals.before ?? 'N/A'],
+      ['CL không Fresh tháng T + D', totals.during ?? 'N/A'],
+      ['CL Fresh cả kỳ', totals.fresh ?? 'N/A'],
+      ['Vượt định mức 0,30%', totals.excess ?? 'N/A'],
+    ], [39, 35], {1: money});
+  }
+  if (periodCategories) {
+    add('MCH2 ca ky', ['Ngành hàng', 'Netoff', 'GT MCH3', 'Doanh thu', 'Tỉ lệ MCH2'],
+      periodCategories.departments.map(row => [row.name, row.net, row.value, row.revenue, row.ratio]),
+      [42, 20, 20, 20, 18], {1:money,2:money,3:money,4:'0.00%'});
+    add('MCH3 ca ky', ['Ngành hàng', 'Lệch âm', 'Lệch dương', 'Netoff', 'GT MCH3', 'Tỉ lệ MCH3', 'GT VĐM MCH3'],
+      periodCategories.categories.map(row => [[row.name, row.parent].filter(Boolean).join(' · '), row.negative, row.positive, row.net, row.value, row.ratio, row.excess]),
+      [55, 20, 20, 20, 20, 18, 20], {1:money,2:money,3:money,4:money,5:'0.00%',6:money});
+  }
   add('MCH2', ['Mã MCH2','Tên MCH2','SL mã','Lệch âm','Lệch dương','Ròng','Tỉ trọng'], overview.parents.map(r => [r.code,r.name,r.productCount,r.negative,r.positive,r.net,r.share]), [18,38,14,20,20,20,14], {3:money,4:money,5:money,6:'0.0%'});
   add('MCH3', ['Mã MCH3','Ngành hàng','Dòng DSCL','Lệch âm','Lệch dương','Ròng'], summary.industries.map(r => [r.code,r.name,r.count,r.negative,r.positive,r.net]), [18,38,15,20,20,20], {3:money,4:money,5:money});
   const ranking = (name, rows) => add(name,['Hạng','Mã SP','Tên SP','SL sổ','SL đếm','SL chênh lệch','GT chênh lệch'],rows.map((r,i)=>[i+1,r.code,r.name,r.book,r.counted,r.counted-r.book,r.value]),[10,18,65,15,15,18,22],{3:qty,4:qty,5:qty,6:money});

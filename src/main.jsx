@@ -4,16 +4,21 @@ import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, LayoutDash
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
 import Dashboard from './Dashboard';
+import RecapDashboard from './RecapDashboard';
 import IndustryImport from './IndustryImport';
 import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
 import EmployeeCheck from './EmployeeCheck';
 import FinalView from './FinalView';
+import ClkkReport from './ClkkReport';
+import ClkkFolderSync from './ClkkFolderSync';
 import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
- { id:'dashboard', label:'Dashboard', Icon:LayoutDashboard, adminOnly:true },
+ { id:'dashboard', label:'Dashboard ngày D', Icon:LayoutDashboard, adminOnly:true },
+ { id:'recap', label:'Dashboard All (RECAP)', Icon:LayoutDashboard, adminOnly:true },
  { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
+ { id:'clkk', label:'Báo cáo CLKK và Biên bản', Icon:FileCheck2, adminOnly:true },
  { id:'phan_cong', label:'Phân công', Icon:ClipboardList, employeeOnly:true },
  { id:'account', label:'Tài khoản & mật khẩu', Icon:Users },
 ];
@@ -56,6 +61,8 @@ function PasswordManager({profile,onMessage}){
 }
 
 function App(){const [session,setSession]=useState(null),[profile,setProfile]=useState(null),[mnv,setMnv]=useState(''),[password,setPassword]=useState(''),[tab,setTab]=useState('dscl'),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[inventoryRevision,setInventoryRevision]=useState(0),[importTable,setImportTable]=useState('dscl'),[upload,setUpload]=useState(null),[uploadBusy,setUploadBusy]=useState(false),[recoveryMode,setRecoveryMode]=useState(()=>window.location.hash.includes('type=recovery')),[recoveryReady,setRecoveryReady]=useState(false),[newPassword,setNewPassword]=useState(''),[confirmPassword,setConfirmPassword]=useState('');const admin=profile?.vai_tro?.toUpperCase()==='ADMIN';
+ const [syncRevision,setSyncRevision]=useState(0);
+ const [resetRevision,setResetRevision]=useState(0);
 useEffect(()=>{
  if(!supabase)return;
  let active=true;
@@ -164,14 +171,20 @@ return (
        {uploadBusy&&<p role="status">Đang xử lý…</p>}
       </section>
       <IndustryImport onSaved={()=>setInventoryRevision(value=>value+1)}/>
-      <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setUpload(null)}}/>
+      <PeriodManager admin={admin} onMessage={setMessage} onNewPeriod={()=>{setInventoryRevision(value=>value+1);setResetRevision(value=>value+1);setUpload(null)}}/>
       <AssignmentTools onMessage={setMessage}/>
      </div>
     </details>}
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
-   {currentPage.id==='dashboard'&&<Dashboard/>}
-   {currentPage.id==='final_lines'&&<FinalView/>}
+   {admin&&<ClkkFolderSync visible={currentPage.id==='clkk'} resetRevision={resetRevision} onSaved={()=>setSyncRevision(value=>value+1)}/>}
+   {currentPage.id==='dashboard'&&<Dashboard syncRevision={syncRevision}/>}
+   {currentPage.id==='recap'&&<RecapDashboard syncRevision={syncRevision}/>}
+   {currentPage.id==='final_lines'&&<>
+    <Button type="button" variant="outline" onClick={()=>setTab('clkk')}>Mở báo cáo CLKK của kỳ</Button>
+    <FinalView/>
+   </>}
+   {currentPage.id==='clkk'&&<ClkkReport syncRevision={syncRevision}/>}
    {currentPage.id==='account'&&<div className="account-page">
     {admin&&<Accounts/>}
     <PasswordManager profile={profile} onMessage={setMessage}/>
