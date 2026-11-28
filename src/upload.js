@@ -64,7 +64,7 @@ function numberValue(value, cellLabel) {
   return number;
 }
 
-export async function parseExcel(file, table) {
+export async function parseExcel(file, table, { dashboardDscl = false } = {}) {
   if (!fields[table]) throw Error('Bảng không hỗ trợ');
   if (file.size > 30 * 1024 * 1024) throw Error('File vượt quá 30 MB');
 
@@ -78,7 +78,12 @@ export async function parseExcel(file, table) {
   if (headIndex < 0) throw Error('Không tìm thấy cột Mã SP / Mã sản phẩm / Vật tư');
 
   const header = matrix[headIndex];
-  const colmap = header.map(value => mapping[norm(value).replace(/\b(roud|round)([12])\b/g, '$1 $2')] || null);
+  const tableFields = dashboardDscl ? [...fields[table], 'ma_ch'] : fields[table];
+  const colmap = header.map(value => {
+    const field = norm(value).replace(/\b(roud|round)([12])\b/g, '$1 $2');
+    if (dashboardDscl && ['nha may', 'plant', 'ma sap', 'ma ch'].includes(field)) return 'ma_ch';
+    return mapping[field] || null;
+  });
 
   if (table === 'ct_kv') {
     header.forEach((value, column) => {
@@ -89,7 +94,7 @@ export async function parseExcel(file, table) {
     });
   }
 
-  const columns = [...new Set(colmap.filter(column => fields[table].includes(column)))];
+  const columns = [...new Set(colmap.filter(column => tableFields.includes(column)))];
   if (!columns.includes('ma_sp')) throw Error('Thiếu cột mã sản phẩm');
   if (columns.length < 2) throw Error('Không nhận diện đủ cột. Kiểm tra tiêu đề Excel');
 
@@ -98,6 +103,7 @@ export async function parseExcel(file, table) {
     : table === 'bc'
       ? ['ma_sp', 'barcode']
       : ['ma_sp', 'ten_sp', 'sl_dem', 'gt_chenh_lech'];
+  if (dashboardDscl) required.push('ma_ch');
   const missing = required.filter(column => !columns.includes(column));
   if (missing.length) {
     throw Error(`File ${table.toUpperCase()} thiếu cột: ${missing.join(', ')}. Chưa thay đổi dữ liệu cũ.`);
@@ -115,7 +121,7 @@ export async function parseExcel(file, table) {
 
     const record = {};
     colmap.forEach((key, column) => {
-      if (!key || !fields[table].includes(key) || Object.hasOwn(record, key)) return;
+      if (!key || !tableFields.includes(key) || Object.hasOwn(record, key)) return;
 
       const cell = XLSX.utils.encode_cell({ r: index, c: column });
       const value = key.startsWith('nguoi_cap_nhat') ? worksheet[cell]?.w ?? row[column] : row[column];
@@ -135,6 +141,7 @@ export async function parseExcel(file, table) {
         : String(value).trim();
     });
 
+    if (dashboardDscl && !record.ma_ch) throw Error(`Dòng Excel ${index + 1} thiếu mã CH (Nhà máy).`);
     if (!record.ma_sp) throw Error(`Dòng Excel ${index + 1} thiếu mã sản phẩm`);
 
     if (table === 'dscl' && diffIndex >= 0 && record.gt_chenh_lech !== undefined) {
@@ -153,7 +160,7 @@ export async function parseExcel(file, table) {
 
   if (!rows.length) throw Error('Không có dòng dữ liệu');
 
-  if (table === 'dscl') {
+  if (table === 'dscl' && !dashboardDscl) {
     const sample = rows.slice(0, 5).map(row => `${row.ma_sp}: ${row.sl_dem}`).join('; ');
     console.info('[V10 DSCL] SL đếm Excel mẫu:', sample);
     if (rows.every(row => row.sl_dem === 0)) {
@@ -210,6 +217,17 @@ async function replaceBarcodeTable(supabase, rows, onProgress) {
   return data;
 }
 
+export async function parseDashboardDscl(file) {
+  const { rows } = await parseExcel(file, 'dscl', { dashboardDscl: true });
+  const groups = new Map();
+  for (const { ma_ch, ...row } of rows) {
+    const code = ma_ch.toUpperCase();
+    if (!groups.has(code)) groups.set(code, []);
+    groups.get(code).push(row);
+  }
+  return Array.from(groups, ([ma_ch, dong]) => ({ ma_ch, dong }));
+}
+
 export async function replaceTable(supabase, table, rows, onProgress = () => {}) {
   if (!fields[table] || !Array.isArray(rows) || !rows.length) {
     throw Error('Bảng hoặc dữ liệu không hợp lệ');
@@ -232,7 +250,7 @@ export async function replaceTable(supabase, table, rows, onProgress = () => {})
     throw Error('Thay thế không thành công: ' + error.message + ' (giao dịch rollback nếu SQL phát sinh lỗi)');
   }
 
-  if (table === 'dscl') {
+  if (table === 'dscl' && !dashboardDscl) {
     const sample = rows.find(row => row.sl_dem !== 0);
     const { data: check, error: checkError } = await supabase
       .from('dscl')

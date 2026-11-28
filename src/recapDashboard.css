@@ -21,9 +21,17 @@
 .recap-table thead th { white-space: nowrap; }
 .recap-table th[scope="row"] { position: static; text-align: left; min-width: 145px; background: transparent; }
 .recap-table th[scope="row"] small { display: block; color: var(--muted); }
-.recap-table td:nth-child(n+5):nth-child(-n+8) { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
+.recap-table:not(.recap-with-comparison) td:nth-child(n+5):nth-child(-n+9), .recap-with-comparison td:nth-child(n+6):nth-child(-n+10) { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
 .recap-table tr.recap-highlight > * { background: #f1eaff; }
 .recap-status { display: inline-block; padding: 4px 8px; border-radius: 7px; font-size: .78rem; white-space: nowrap; }
 .recap-ok { background: #e2f5ee; color: #126049; }
 .recap-review { background: #fff0d0; color: #774b10; }
 .recap-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+
+.inventory-dashboard-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.recap-rank-list { display: grid; gap: 8px; margin: 0; padding-inline-start: 1.5rem; }
+.recap-rank-list li { display: list-item; padding: 6px 6px 9px; border-bottom: 1px solid var(--line); }
+.recap-rank-list li > * { margin-inline-end: 12px; }
+.recap-rank-list small { display: block; color: var(--muted); }
+.recap-rank-list button { margin-top: 4px; padding: 4px 8px; }
+.recap-table td { font-variant-numeric: tabular-nums; }

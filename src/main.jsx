@@ -3,8 +3,7 @@ import { Button } from './components/ui/button';
 import { PackageCheck, LogOut, ListChecks, FileCheck2, ClipboardList, LayoutDashboard, Users } from 'lucide-react';
 import PeriodManager from './PeriodManager';
 import InventoryList from './InventoryList';
-import Dashboard from './Dashboard';
-import RecapDashboard from './RecapDashboard';
+import InventoryDashboard from './InventoryDashboard';
 import IndustryImport from './IndustryImport';
 import AssignmentTools from './AssignmentTools';
 import Accounts from './Accounts';
@@ -15,8 +14,7 @@ import ClkkFolderSync from './ClkkFolderSync';
 import React,{useEffect,useState} from 'react';import{createRoot}from'react-dom/client';import{supabase,configured}from'./supabase';import './style.css';import './redesign.css';import {parseExcel,replaceTable} from './upload';
 const PAGES=[
  { id:'dscl', label:'Danh sách mã hàng', Icon:ListChecks },
- { id:'dashboard', label:'Dashboard ngày D', Icon:LayoutDashboard, adminOnly:true },
- { id:'recap', label:'Dashboard All (RECAP)', Icon:LayoutDashboard, adminOnly:true },
+ { id:'dashboard', label:'Dashboard Kiểm kê', Icon:LayoutDashboard, adminOnly:true },
  { id:'final_lines', label:'Final', Icon:FileCheck2, adminOnly:true },
  { id:'clkk', label:'Báo cáo CLKK và Biên bản', Icon:FileCheck2, adminOnly:true },
  { id:'phan_cong', label:'Phân công', Icon:ClipboardList, employeeOnly:true },
@@ -178,8 +176,7 @@ return (
    </>}
    {currentPage.id==='phan_cong'&&<EmployeeCheck profile={profile} onMessage={setMessage}/>}
    {admin&&<ClkkFolderSync visible={currentPage.id==='clkk'} resetRevision={resetRevision} onSaved={()=>setSyncRevision(value=>value+1)}/>}
-   {currentPage.id==='dashboard'&&<Dashboard syncRevision={syncRevision}/>}
-   {currentPage.id==='recap'&&<RecapDashboard syncRevision={syncRevision}/>}
+   {currentPage.id==='dashboard'&&<InventoryDashboard syncRevision={syncRevision}/>}
    {currentPage.id==='final_lines'&&<>
     <Button type="button" variant="outline" onClick={()=>setTab('clkk')}>Mở báo cáo CLKK của kỳ</Button>
     <FinalView/>

@@ -4,7 +4,7 @@ import { supabase } from './supabase';
 import { Button } from './components/ui/button';
 import { summarizeInventory } from './dashboardData';
 import { summarizeClkk, summarizePeriodCategories } from './clkkData';
-import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
+import { periodKey, readClkkGroups, readClkkPeriods, readClkkSchedules } from './clkkQueries';
 import './dashboard.css';
 import { saveDashboardSnapshot } from './dashboardSnapshot';
 import { exportDashboard } from './dashboardExport';
@@ -68,7 +68,32 @@ function ProductRanking({ title, rows, direction }) {
   </section>;
 }
 
-export default function Dashboard({ syncRevision = 0 }) {
+function DsclRows({ rows }) {
+  const [term, setTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const query = term.trim().toLowerCase();
+  const filtered = rows.filter(row => `${row.ma_sp} ${row.ten_sp}`.toLowerCase().includes(query));
+  const pageSize = 25;
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
+  const start = (currentPage - 1) * pageSize;
+  return <details className="panel dashboard-panel">
+    <summary>Danh sách mã hàng DSCL · {integer.format(rows.length)} dòng</summary>
+    <label>Tìm mã hoặc tên hàng <input type="search" value={term} onChange={event => { setTerm(event.target.value); setPage(1); }}/></label>
+    <div className="tablewrap">
+      <table><thead><tr>{['Mã hàng','Tên hàng','SL sổ','SL đếm','Giá trị chênh lệch'].map(label => <th key={label} scope="col">{label}</th>)}</tr></thead>
+      <tbody>{filtered.slice(start, start + pageSize).map((row, index) => <tr key={start + index}>
+        <th scope="row">{row.ma_sp}</th><td>{row.ten_sp}</td><td>{row.sl_so ?? '—'}</td><td>{row.sl_dem ?? '—'}</td>
+        <td className={tone(row.gt_chenh_lech)}>{row.gt_chenh_lech == null ? '—' : money(row.gt_chenh_lech)}</td>
+      </tr>)}</tbody></table>
+    </div>
+    <div className="recap-pagination"><span>{integer.format(filtered.length)} dòng khớp</span><div>
+      <button type="button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Trước</button>{' '}
+      <button type="button" disabled={start + pageSize >= filtered.length} onClick={() => setPage(currentPage + 1)}>Sau</button>
+    </div></div>
+  </details>;
+}
+
+export default function Dashboard({ syncRevision = 0, scope = null }) {
   const dashboardRef = useRef(null);
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');
@@ -87,7 +112,12 @@ export default function Dashboard({ syncRevision = 0 }) {
     setPeriodsBusy(true);
     setPeriodError('');
     setDates(null);
-    readClkkPeriods().then(result => {
+    const periodRequest = scope
+      ? readClkkSchedules([scope.ma_ch]).then(rows => ({
+        codes: [scope.ma_ch], schedules: rows.filter(row => row.ngay_moi === scope.ngay_moi),
+      }))
+      : readClkkPeriods();
+    periodRequest.then(result => {
       if (!active) return;
       setDates(result);
       setSelectedPeriod(previous => result.schedules.some(row => periodKey(row) === previous)
@@ -98,7 +128,7 @@ export default function Dashboard({ syncRevision = 0 }) {
       if (active) setPeriodsBusy(false);
     });
     return () => { active = false; };
-  }, [refresh, syncRevision]);
+  }, [refresh, syncRevision, scope]);
 
   const period = dates?.schedules.find(row => periodKey(row) === selectedPeriod);
   const sameMonth = Boolean(period?.ngay_cu && period.ngay_cu.slice(0, 7) === period.ngay_moi.slice(0, 7));
@@ -122,8 +152,15 @@ export default function Dashboard({ syncRevision = 0 }) {
     let active = true;
     setBusy(true);
     setError('');
+    const inventoryRequest = scope
+      ? supabase.from('v10_dashboard_dscl').select('dong').eq('ma_ch', scope.ma_ch).eq('ngay_moi', scope.ngay_moi)
+        .maybeSingle().then(({ data, error }) => {
+          if (error) throw error;
+          return data?.dong ?? [];
+        })
+      : readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech,sl_dem,sl_so');
     Promise.all([
-      readPages('dscl', 'ma_sp,ten_sp,nhom_vat_tu,gt_chenh_lech,sl_dem,sl_so'),
+      inventoryRequest,
       readPages('v10_nganh_hang', 'ma_nhom,ten_nganh,ma_mch2,ten_mch2', 'ma_nhom'),
     ]).then(([inventory, catalog]) => {
       if (!active) return;
@@ -134,7 +171,7 @@ export default function Dashboard({ syncRevision = 0 }) {
       if (active) setBusy(false);
     });
     return () => { active = false; };
-  }, [refresh, syncRevision]);
+  }, [refresh, syncRevision, scope]);
 
   const overview = useMemo(() => snapshot && summarizeInventory(snapshot.inventory, snapshot.catalog), [snapshot]);
   const summary = useMemo(() => {
@@ -167,11 +204,11 @@ export default function Dashboard({ syncRevision = 0 }) {
   return <div ref={dashboardRef} className="dashboard-view" aria-busy={busy}>
     <header className="dashboard-hero">
       <div className="dashboard-hero-header">
-        <div><h2>Tổng quan kiểm kê</h2>
+        <div><h2>{scope ? scope.ten_ch : 'Tổng quan kiểm kê'}</h2>
           {period && <p className="dashboard-period-context"><CalendarDays size={16} aria-hidden="true"/>{period.ma_ch} · Ngày kiểm kê {date(period.ngay_moi)}</p>}
         </div>
         <label className="dashboard-period-picker">Kỳ kiểm kê
-          <select value={selectedPeriod} disabled={periodsBusy || !dates?.schedules.length} onChange={event => setSelectedPeriod(event.target.value)}>
+          <select value={selectedPeriod} disabled={!!scope || periodsBusy || !dates?.schedules.length} onChange={event => setSelectedPeriod(event.target.value)}>
             <option value="">{periodsBusy ? 'Đang tải lịch…' : dates?.schedules.length ? 'Chọn kỳ kiểm kê' : 'Chưa có lịch phù hợp'}</option>
             {dates?.schedules.map(row => <option key={periodKey(row)} value={periodKey(row)}>{row.ma_ch} · {date(row.ngay_moi)}</option>)}
           </select>
@@ -185,12 +222,12 @@ export default function Dashboard({ syncRevision = 0 }) {
       </div>
     </header>
     <div className="dashboard-toolbar">
-      <div><p className="dashboard-caption">Nguồn ngày D: DSCL gốc · Đơn vị VND</p></div>
+      <div><p className="dashboard-caption">{scope ? 'Nguồn cả kỳ: SAP · Đơn vị VND' : 'Nguồn ngày D: DSCL gốc · Đơn vị VND'}</p></div>
       <div className="dashboard-controls">
-        <label>MCH3 của DSCL<select className="dashboard-industry-select" value={industry} onChange={event => setIndustry(event.target.value)}>
+        {snapshot?.inventory.length > 0 && <label>MCH3 của DSCL<select className="dashboard-industry-select" value={industry} onChange={event => setIndustry(event.target.value)}>
           <option value="">Tất cả MCH3</option>
           {overview?.industries.filter(row => row.code).map(row => <option key={row.code} value={row.code}>{row.name} · {row.code}</option>)}
-        </select></label>
+        </select></label>}
         <Button type="button" variant="outline" disabled={busy} onClick={() => setRefresh(value => value + 1)}>
           <RefreshCw size={16} aria-hidden="true"/> Tải lại
         </Button>
@@ -206,9 +243,11 @@ export default function Dashboard({ syncRevision = 0 }) {
     {error && <p className="warning" role="alert">Không tải được dữ liệu mới. {error}</p>}
     <section className="panel dashboard-panel">
       <h2>Kết quả chênh lệch kiểm kê ngày D{period ? ` · ${date(period.ngay_moi)}` : ''}</h2>
-      <p className="dashboard-caption">Giá trị từ DSCL gốc, trước điều chỉnh Final.{period && !dates?.codes.length ? ' DSCL chưa có mã SAP để đối chiếu với kỳ đang chọn.' : ''}</p>
-      {summary && snapshot.inventory.length ? <DiscrepancyMetrics summary={summary}/> : !busy && !error && <p className="empty">Chưa có dữ liệu DSCL.</p>}
+      {scope && snapshot?.inventory.length > 0 && <p className="dashboard-caption">DSCL gốc của mã CH và ngày dự kiến đã chọn.</p>}
+      {!scope && <p className="dashboard-caption">Giá trị từ DSCL đang làm việc, trước điều chỉnh Final.{period && !dates?.codes.length ? ' DSCL chưa có mã SAP để đối chiếu với kỳ đang chọn.' : ''}</p>}
+      {summary && snapshot.inventory.length ? <DiscrepancyMetrics summary={summary}/> : !busy && !error && <p className="empty">{scope ? `Chưa có DSCL đã liên kết cho ${scope.ma_ch} ngày ${date(scope.ngay_moi)}.` : 'Chưa có dữ liệu DSCL.'}</p>}
     </section>
+    {snapshot?.inventory.length > 0 && <DsclRows rows={snapshot.inventory}/>}
     <section className="panel dashboard-panel dashboard-period-results">
       <h2>Kết quả chênh lệch kiểm kê cả kỳ{period ? ` · ${date(period.ngay_cu)} – ${date(period.ngay_moi)}` : ''}</h2>
       {isPeriodLoading && <p role="status">Đang tải số liệu cả kỳ…</p>}

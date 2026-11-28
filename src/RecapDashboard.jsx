@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CalendarDays, ChartNoAxesCombined, PackageSearch } from 'lucide-react';
 import { supabase } from './supabase';
 import { prepareRecapRows, recapInsights, recapLossRate, recapRowKey, sortRecapRows } from './recapData';
+import RecapRankings from './RecapRankings';
 import './dashboard.css';
 import './recapDashboard.css';
 
@@ -13,12 +14,13 @@ const date = value => value.split('-').reverse().join('/');
 const normalize = value => String(value ?? '').toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').replaceAll('đ', 'd').trim();
 const pageSize = 25;
 
-export default function RecapDashboard({ syncRevision }) {
+export default function RecapDashboard({ syncRevision = 0, dsclRevision = 0, mode = 'all', onOpenPeriod }) {
   const [month, setMonth] = useState(() => new Intl.DateTimeFormat('sv-SE', { year: 'numeric', month: '2-digit', timeZone: 'Asia/Bangkok' }).format(new Date()));
   const [allPeriods, setAllPeriods] = useState(false);
   const [director, setDirector] = useState('');
   const [manager, setManager] = useState('');
   const [search, setSearch] = useState('');
+  const [selected, setSelected] = useState([]);
   const [status, setStatus] = useState('all');
   const [order, setOrder] = useState('date');
   const [page, setPage] = useState(1);
@@ -51,6 +53,15 @@ export default function RecapDashboard({ syncRevision }) {
     return () => { active = false; };
   }, [scope, syncRevision]);
 
+  useEffect(() => {
+    setDirector('');
+    setManager('');
+    setSearch('');
+    setSelected([]);
+    setPage(1);
+    setHighlight('');
+  }, [mode]);
+
   const rows = frame?.scope === scope ? frame.rows ?? [] : [];
   const options = values => [...new Set(values)].sort((a, b) => a.localeCompare(b, 'vi'));
   const directors = options(rows.map(row => row.gdv));
@@ -63,6 +74,7 @@ export default function RecapDashboard({ syncRevision }) {
         || (status === 'missing' && row.tinh_trang === 'Thiếu dữ liệu SAP')
         || (status === 'exceeds' && row.exceeds)));
   }, [rows, director, manager, search, status]);
+  const needsScope = (mode === 'director' && !director) || (mode === 'manager' && !manager);
   const ranked = useMemo(() => sortRecapRows(filtered, order), [filtered, order]);
   const insights = useMemo(() => recapInsights(filtered), [filtered]);
   const pages = Math.max(1, Math.ceil(ranked.length / pageSize));
@@ -73,6 +85,7 @@ export default function RecapDashboard({ syncRevision }) {
     setter(value);
     setPage(1);
     setHighlight('');
+    if (setter !== setOrder) setSelected([]);
   }
 
   function drillDown(row) {
@@ -87,6 +100,7 @@ export default function RecapDashboard({ syncRevision }) {
   }, [highlight, currentPage]);
 
   const signals = [
+    { label: 'GT vượt định mức lớn nhất', row: insights.largestExcess, value: fmt(insights.largestExcess?.excess), Icon: AlertTriangle },
     { label: 'CLKK âm lớn nhất', row: insights.largestLoss, value: fmt(insights.largestLoss?.clkk), Icon: ChartNoAxesCombined },
     { label: 'Tỷ lệ CLKK âm cao nhất', row: insights.highestRatio, value: insights.highestRatio ? percentage.format(insights.highestRatio.ratio) : 'N/A', Icon: AlertTriangle },
     { label: 'HCXL cao nhất', row: insights.highestHcxl, value: fmt(insights.highestHcxl?.hcxl), Icon: PackageSearch },
@@ -94,7 +108,7 @@ export default function RecapDashboard({ syncRevision }) {
 
   return <div className="dashboard-view recap-view">
     <section className="dashboard-hero recap-hero">
-      <div><h2>RECAP kiểm kê</h2><p className="dashboard-period-context"><CalendarDays size={16} aria-hidden="true"/>{allPeriods ? 'Toàn bộ kỳ' : month ? `Tháng ${month.split('-').reverse().join('/')}` : 'Chọn tháng kiểm kê'}</p></div>
+      <div><h2>{mode === 'store' ? 'Chọn cửa hàng và kỳ' : 'RECAP kiểm kê'}</h2><p className="dashboard-period-context"><CalendarDays size={16} aria-hidden="true"/>{allPeriods ? 'Toàn bộ kỳ' : month ? `Tháng ${month.split('-').reverse().join('/')}` : 'Chọn tháng kiểm kê'}</p></div>
       <div className="recap-stats">
         {[
           ['Cửa hàng có lịch', insights.stores],
@@ -119,8 +133,9 @@ export default function RecapDashboard({ syncRevision }) {
       {scope && frame?.scope !== scope && <p role="status">Đang tải RECAP…</p>}
       {frame?.scope === scope && frame.error && <p role="alert">{frame.error}</p>}
     </section>
-    {frame?.rows && <>
-      <section className="panel dashboard-panel">
+    {frame?.rows && needsScope && <p className="panel">Chọn {mode === 'director' ? 'một GĐV' : 'một QLKV'} để xem xếp hạng và các kỳ tương ứng.</p>}
+    {frame?.rows && !needsScope && <>
+      {mode !== 'store' && <section className="panel dashboard-panel">
         <h2>Điểm cần chú ý</h2>
         {insights.missingSap > 0 && <p className="recap-gap"><strong>{number.format(insights.missingSap)} kỳ thiếu SAP.</strong> Bổ sung CLKK và doanh thu theo tháng cho các mã SAP tương ứng.{' '}
           <button type="button" onClick={() => changeFilter(setStatus, 'missing')}>Xem kỳ thiếu SAP</button>
@@ -132,29 +147,41 @@ export default function RecapDashboard({ syncRevision }) {
             {row && <><p>{row.ma_ch} · {row.ten_ch} · {date(row.ngay_moi)}</p><button type="button" onClick={() => drillDown(row)}>Xem kỳ này</button></>}
           </article>)}
         </div>
-      </section>
+      </section>}
       <section className="panel dashboard-panel" ref={tableRef}>
         <div className="dashboard-section-heading">
           <h2>Chi tiết cửa hàng và kỳ kiểm kê</h2>
           <label>Sắp xếp <select value={order} onChange={e => changeFilter(setOrder, e.target.value)}>
             <option value="date">Ngày kiểm kê mới nhất</option>
+            <option value="excess">GT vượt định mức lớn nhất</option>
             <option value="clkk">CLKK âm lớn nhất</option>
             <option value="ratio">Tỷ lệ âm cao nhất</option>
             <option value="hcxl">HCXL cao nhất</option>
           </select></label>
         </div>
+        {mode !== 'store' && <p className="dashboard-caption">Chọn tối đa 3 kỳ để so sánh. {selected.length}/3 kỳ đã chọn. {selected.length >= 2 && <a href="#recap-compare">Mở bảng so sánh</a>}</p>}
         <p className="dashboard-caption">Một dòng cho mỗi mã SAP và ngày kiểm kê. Tỷ lệ là CLKK không Fresh chia doanh thu không Fresh của kỳ. Ngày D tạm tính bằng 0.</p>
         {ranked.length ? <>
-          <div className="tablewrap recap-table-scroll"><table className="recap-table">
-            <thead><tr>{['Cửa hàng','Ngày kiểm kê','GĐV','QLKV','CLKK MCH3','Doanh thu','Tỷ lệ','HCXL','Trạng thái'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
+          <div className="tablewrap recap-table-scroll"><table className={mode === 'store' ? 'recap-table' : 'recap-table recap-with-comparison'}>
+            <thead><tr>{[...(mode === 'store' ? [] : ['So sánh']), 'Cửa hàng','Ngày kiểm kê','GĐV','QLKV','CLKK MCH3','Doanh thu','Tỷ lệ','GT VĐM','HCXL','Trạng thái','Chi tiết'].map(label => <th scope="col" key={label}>{label}</th>)}</tr></thead>
             <tbody>{ranked.slice(offset, offset + pageSize).map(row => <tr key={recapRowKey(row)} className={highlight === recapRowKey(row) ? 'recap-highlight' : undefined}>
+              {mode !== 'store' && <td><input type="checkbox"
+                aria-label={`So sánh ${row.ma_ch} ngày ${date(row.ngay_moi)}`}
+                checked={selected.includes(recapRowKey(row))}
+                disabled={selected.length >= 3 && !selected.includes(recapRowKey(row))}
+                onChange={event => {
+                  const key = recapRowKey(row);
+                  setSelected(previous => event.target.checked ? [...previous, key] : previous.filter(item => item !== key));
+                }}/></td>}
               <th scope="row"><strong>{row.ma_ch}</strong><small>{row.ten_ch}</small></th>
               <td>{date(row.ngay_moi)}</td><td>{row.gdv}</td><td>{row.qlkv}</td>
               <td className={Number(row.clkk) < 0 ? 'negative' : undefined}>{fmt(row.clkk)}</td>
               <td>{fmt(row.doanh_thu)}</td>
               <td className={row.exceeds ? 'negative' : undefined}>{row.ratio == null ? 'N/A' : percentage.format(row.ratio)}</td>
+              <td className={row.exceeds ? 'negative' : undefined}>{fmt(row.excess)}</td>
               <td>{row.hcxl == null ? 'Chưa có' : fmt(row.hcxl)}</td>
               <td><span className={`recap-status ${row.complete && !row.exceeds ? 'recap-ok' : 'recap-review'}`}>{row.tinh_trang ?? (row.exceeds ? 'Vượt định mức' : 'Đủ dữ liệu')}</span></td>
+              <td><button type="button" onClick={() => onOpenPeriod(row)} aria-label={`Mở kỳ ${row.ma_ch} ngày ${date(row.ngay_moi)}`}>Mở kỳ</button></td>
             </tr>)}</tbody>
           </table></div>
           <div className="recap-pagination">
@@ -164,6 +191,7 @@ export default function RecapDashboard({ syncRevision }) {
           </div>
         </> : <p>Không có kỳ kiểm kê phù hợp với bộ lọc.</p>}
       </section>
+      {mode !== 'store' && filtered.length > 0 && <RecapRankings rows={filtered} selected={selected} revision={dsclRevision + syncRevision} onOpenPeriod={onOpenPeriod}/>}
     </>}
   </div>;
 }

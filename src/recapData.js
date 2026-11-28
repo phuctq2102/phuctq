@@ -5,10 +5,9 @@ export function prepareRecapRows(rows) {
   return rows.map(row => {
     const complete = row.tinh_trang == null && row.clkk != null && row.doanh_thu != null;
     const ratio = complete && Number(row.doanh_thu) > 0 ? Number(row.clkk) / Number(row.doanh_thu) : null;
-    return {
-      ...row, complete, ratio,
-      exceeds: ratio != null && Number(row.clkk) + Number(row.doanh_thu) * recapLossRate < -0.000001,
-    };
+    const difference = ratio == null ? null : Number(row.clkk) + Number(row.doanh_thu) * recapLossRate;
+    const excess = difference == null ? null : difference < -0.000001 ? difference : 0;
+    return { ...row, complete, ratio, excess, exceeds: excess < 0 };
   });
 }
 
@@ -16,6 +15,7 @@ export function recapInsights(rows) {
   const biggest = (current, next, field, compare) => next[field] != null
     && (!current || compare(Number(next[field]), Number(current[field]))) ? next : current;
   let largestLoss = null;
+  let largestExcess = null;
   let highestRatio = null;
   let highestHcxl = null;
   let missingSap = 0;
@@ -28,10 +28,13 @@ export function recapInsights(rows) {
       if (row.ratio < 0) highestRatio = biggest(highestRatio, row, 'ratio', (a, b) => a < b);
     }
     if (row.tinh_trang === 'Thiếu dữ liệu SAP') missingSap++;
-    if (row.exceeds) exceeds++;
+    if (row.exceeds) {
+      exceeds++;
+      largestExcess = biggest(largestExcess, row, 'excess', (a, b) => a < b);
+    }
     if (Number(row.hcxl) > 0) highestHcxl = biggest(highestHcxl, row, 'hcxl', (a, b) => a > b);
   }
-  return { stores: new Set(rows.map(row => row.ma_ch)).size, largestLoss, highestRatio, highestHcxl, missingSap, exceeds, complete };
+  return { stores: new Set(rows.map(row => row.ma_ch)).size, largestLoss, largestExcess, highestRatio, highestHcxl, missingSap, exceeds, complete };
 }
 
 export function sortRecapRows(rows, order) {

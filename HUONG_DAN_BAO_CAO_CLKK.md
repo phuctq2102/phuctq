@@ -52,3 +52,7 @@ Cài `V10_LICH_KK_NSO.sql` sau migration đồng bộ thư mục. Tự động n
 Cài `V10_CLKK_NSO.sql` sau migration lịch NSO. Chế độ **Theo GĐV** dùng từng ngày kiểm kê để tách kỳ, lấy GĐV từ lịch và tính tỷ lệ bằng tổng CLKK chia tổng doanh thu của các cửa hàng có đủ dữ liệu. HCXL tùy chọn và phân nhóm theo số ngày còn lại đến HSD tại ngày kiểm kê.
 
 Cài `V10_DASHBOARD_RECAP.sql` sau migration GĐV. Menu **Dashboard ngày D** mở giao diện chi tiết cửa hàng. **Dashboard All (RECAP)** đọc tất cả các kỳ đã có trong lịch và cho lọc tháng, GĐV hoặc QLKV. Mỗi nhóm và ngày kiểm kê có tổng riêng. Tổng HCXL lấy từ các cửa hàng đã có giá trị cho đúng kỳ; kỳ chưa có HCXL hiển thị **Chưa có**.
+
+Cài `V10_DASHBOARD_DSCL.sql` để dùng **Nhập DSCL ngày D cho Dashboard**. File SAP DSCL có thể chứa nhiều mã trong cột Nhà máy. Chọn ngày kiểm kê dự kiến từ Lịch KK cho từng mã, sau đó bấm **Mở kỳ** trong RECAP để xem chi tiết. Lượt nhập này tạo dữ liệu báo cáo theo mã và ngày, tách khỏi DSCL làm việc của luồng kiểm đếm. Reset xóa DSCL báo cáo cùng lịch kiểm kê.
+
+Cài `V10_DASHBOARD_XEP_HANG.sql` sau bảng DSCL báo cáo. **Dashboard Kiểm kê** có bốn phạm vi **1 CH**, **QLKV**, **GĐV**, **Toàn bộ**. Top CH được xếp theo từng kỳ và có thể đổi chỉ tiêu. Top mã hàng tổng hợp các kỳ có DSCL trong phạm vi đang lọc. Có thể chọn tối đa ba dòng kỳ để so sánh cạnh nhau.
