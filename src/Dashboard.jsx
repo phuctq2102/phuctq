@@ -6,7 +6,6 @@ import { summarizeInventory } from './dashboardData';
 import { summarizeClkk, summarizePeriodCategories } from './clkkData';
 import { periodKey, readClkkGroups, readClkkPeriods } from './clkkQueries';
 import './dashboard.css';
-import GdvDashboard from './GdvDashboard';
 import { saveDashboardSnapshot } from './dashboardSnapshot';
 import { exportDashboard } from './dashboardExport';
 
@@ -70,17 +69,6 @@ function ProductRanking({ title, rows, direction }) {
 }
 
 export default function Dashboard({ syncRevision = 0 }) {
-  const [view, setView] = useState('store');
-  return <>
-    <nav className="dashboard-controls dashboard-view-switch" aria-label="Phạm vi Dashboard">
-      <Button type="button" variant={view === 'store' ? 'default' : 'outline'} aria-pressed={view === 'store'} onClick={() => setView('store')}>Theo cửa hàng</Button>
-      <Button type="button" variant={view === 'gdv' ? 'default' : 'outline'} aria-pressed={view === 'gdv'} onClick={() => setView('gdv')}>Theo GĐV</Button>
-    </nav>
-    {view === 'gdv' ? <GdvDashboard syncRevision={syncRevision}/> : <StoreDashboard syncRevision={syncRevision}/>}
-  </>;
-}
-
-function StoreDashboard({ syncRevision }) {
   const dashboardRef = useRef(null);
   const [snapshot, setSnapshot] = useState(null);
   const [industry, setIndustry] = useState('');

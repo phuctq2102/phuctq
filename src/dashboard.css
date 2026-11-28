@@ -112,5 +112,3 @@
 @media (prefers-reduced-motion: no-preference) {
   .dashboard-bar span { transition: width .2s ease; }
 }
-
-.dashboard-view-switch { margin-block-end: 14px; }
