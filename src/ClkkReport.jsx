@@ -70,7 +70,12 @@ export default function ClkkReport({ syncRevision = 0 }) {
     setMessage('');
     setBusy(true);
     try {
-      const data = await readClkkFile(file, imports[kind].parse);
+      const config = imports[kind];
+      const data = await readClkkFile(file, config.parse, config);
+      if (!data.length) {
+        setMessage('File không có dòng HCXL. Bạn vẫn có thể tính CLKK.');
+        return;
+      }
       const draft = { data, kind, name: file.name };
       if (kind === 'hcxl') await prepareHcxl(draft);
       else setDraft(kind, draft);
@@ -130,9 +135,8 @@ export default function ClkkReport({ syncRevision = 0 }) {
         supabase.from('v10_clkk_hcxl').select('dong').eq('ma_ch', period.ma_ch).eq('ngay_moi', period.ngay_moi).maybeSingle(),
         supabase.from('v10_clkk_nhan_su').select('mnv', { count: 'exact', head: true }).eq('ma_ch', period.ma_ch),
       ]);
-      if (hcxl.error) throw hcxl.error;
       if (staff.error) throw staff.error;
-      setReport({ rows, hcxl: summarizeHcxl(hcxl.data?.dong), staffCount: staff.count, calculatedAt: new Date() });
+      setReport({ rows, hcxl: summarizeHcxl(hcxl.data?.dong), hcxlError: Boolean(hcxl.error), staffCount: staff.count, calculatedAt: new Date() });
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -150,9 +154,7 @@ export default function ClkkReport({ syncRevision = 0 }) {
     ['Tỷ lệ CLKK/DT', summary.ratio, percent],
     ['Giá trị định mức', summary.quota],
     ['Giá trị vượt định mức', summary.excess],
-    ['Tổng giá trị HCXL', report.hcxl?.total],
-    ['HCXL đổi được', report.hcxl?.eligible],
-    ['HCXL không đổi được', report.hcxl?.ineligible],
+    ...(report.hcxl ? [['Tổng giá trị HCXL', report.hcxl.total]] : []),
   ] : [];
   const visibleRows = report?.rows.filter(row => Object.entries(filters).every(([key, value]) => !value || row[key] === value)) ?? [];
   const metadata = Object.entries(period?.thong_tin ?? {});
@@ -252,8 +254,9 @@ export default function ClkkReport({ syncRevision = 0 }) {
       {summary.missing.length > 0 && <p className="clkk-warning">Thiếu dữ liệu SAP tháng {summary.missing.join(', ')}.</p>}
       {summary.invalidCategory && <p className="clkk-warning">Có nhóm thiếu MCH2 nên chưa xác định Fresh hoặc không Fresh.</p>}
       {!summary.revenue && <p className="clkk-warning">Doanh thu không Fresh bằng 0 hoặc chưa đủ dữ liệu.</p>}
-      {!report.hcxl && <p>Chưa có HCXL cho cửa hàng và ngày kiểm kê này.</p>}
-      {report.hcxl?.incomplete > 0 && <p className="clkk-warning">HCXL có {report.hcxl.incomplete} dòng thiếu thành tiền hoặc điều kiện đổi trả.</p>}
+      {report.hcxlError && <p className="clkk-warning">Chưa tải được giá trị HCXL.</p>}
+      {!report.hcxlError && !report.hcxl && <p>Chưa có dữ liệu HCXL cho kỳ này.</p>}
+      {report.hcxl?.incomplete > 0 && <p className="clkk-warning">HCXL có {report.hcxl.incomplete} dòng thiếu thành tiền.</p>}
       <p>Danh mục nhân sự cửa hàng: {report.staffCount} nhân viên.</p>
       <p>Tính lúc {report.calculatedAt.toLocaleString('vi-VN', { timeZone: 'Asia/Bangkok' })}</p>
       <div className="clkk-grid">{metrics.map(([label, value, format]) => <div className="clkk-metric" key={label}>

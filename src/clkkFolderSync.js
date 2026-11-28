@@ -34,7 +34,11 @@ async function syncFile(kind, file, resetAt, cancelled, activeSchedule, schedule
   const key = receiptPrefix + kind + '.' + await contentHash(bytes);
   const receipts = JSON.parse(localStorage.getItem(key) ?? '[]');
   if (receipts.includes('*') || cancelled()) return {};
-  const rows = scheduleRows ?? await readClkkFile({ arrayBuffer: async () => bytes }, config.parse);
+  const rows = scheduleRows ?? await readClkkFile({ arrayBuffer: async () => bytes }, config.parse, config);
+  if (!rows.length) {
+    if (!cancelled()) localStorage.setItem(key, JSON.stringify(['*']));
+    return {};
+  }
   let payload = rows;
   let completed = ['*'];
   let pending = [];

@@ -79,11 +79,11 @@ export function parseSchedule(rows, date1904) {
   return [...periods.values()];
 }
 
-export async function readClkkFile(file, parse) {
+export async function readClkkFile(file, parse, { allowEmpty = false } = {}) {
   const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
   const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1, defval: null, blankrows: false });
   const data = parse(rows, Boolean(workbook.Workbook?.WBProps?.date1904));
-  if (!data.length) throw new Error('File không có dữ liệu để nhập.');
+  if (!data.length && !allowEmpty) throw new Error('File không có dữ liệu để nhập.');
   return data;
 }
 
@@ -117,8 +117,8 @@ export function summarizeClkk(rows, period, rate) {
 
 export function parseHcxl(rows, date1904) {
   const headers = ['mã ch', 'mã sản phẩm', 'tên sản phẩm', 'hsd (tháng/ngày/năm)', 'thành tiền', 'điều kiện đổi trả (có/không)'];
-  const header = rows.findIndex(row => headers.every(label => row.some(value => textKey(value) === label)));
-  if (header < 0) throw new Error('Không tìm thấy tiêu đề GT_HCXL từ mẫu Excel.');
+  const header = rows.findIndex(row => [headers[0], headers[4]].every(label => row.some(value => textKey(value) === label)));
+  if (header < 0) throw new Error('File HCXL cần cột Mã CH và Thành tiền.');
   const positions = headers.map(label => rows[header].findIndex(value => textKey(value) === label));
   const groups = new Map();
   rows.slice(header + 1).forEach((row, index) => {
@@ -126,9 +126,8 @@ export function parseHcxl(rows, date1904) {
     const [code, product, name, expiry, amount, eligibility] = positions.map(i => row[i]);
     const ma_ch = store(code);
     const line = header + index + 2;
-    if (!ma_ch || !clean(product)) throw new Error(`Dòng ${line} thiếu mã CH hoặc mã sản phẩm.`);
+    if (!ma_ch) throw new Error(`Dòng ${line} thiếu mã CH.`);
     const hsd = dateKey(expiry, date1904);
-    if (!hsd) throw new Error(`Dòng ${line} thiếu HSD hợp lệ.`);
     const dieu_kien = textKey(eligibility);
     const dong = { ma_sp: clean(product), ten_sp: clean(name), hsd, thanh_tien: numeric(amount, line),
       doi_tra: dieu_kien === 'có' ? true : dieu_kien === 'không' ? false : null, goc: row };
@@ -161,15 +160,10 @@ export function parseStaff(rows) {
 
 export function summarizeHcxl(rows) {
   if (!rows?.length) return null;
-  const sum = group => group.reduce((total, row) => total + row.thanh_tien, 0);
-  const known = rows.filter(row => row.thanh_tien != null);
+  const known = rows.filter(row => Number.isFinite(row.thanh_tien));
   return {
-    total: known.length === rows.length ? sum(known) : null,
-    eligible: rows.some(row => row.doi_tra == null || (row.doi_tra && row.thanh_tien == null))
-      ? null : sum(known.filter(row => row.doi_tra === true)),
-    ineligible: rows.some(row => row.doi_tra == null || (row.doi_tra === false && row.thanh_tien == null))
-      ? null : sum(known.filter(row => row.doi_tra === false)),
-    incomplete: rows.filter(row => row.thanh_tien == null || row.doi_tra == null).length,
+    total: known.length === rows.length ? known.reduce((total, row) => total + row.thanh_tien, 0) : null,
+    incomplete: rows.length - known.length,
   };
 }
 
